@@ -1,0 +1,145 @@
+---
+title: "Desafios e Requisitos dos Projetos Analiticos"
+authores: "Davi Almeida Ferreira e Guilherme Rocha Gomez"
+date: "Julho de 2021"
+output:
+  html_document:
+        code_folding: hide
+        number_sections: no
+        toc: yes
+        toc_float:
+            collapsed: yes
+            smooth_scroll: yes
+---
+Turma: **FGV TBABD-8**  
+Professor: **Rafael Lychowski**  
+Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez**  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 10, warning = F, error = F)
+```
+
+
+
+```{r include=FALSE}
+library(caret)
+library(mlbench)
+library(dplyr)
+library(tidyverse)
+
+
+spark_path <-'C:/Guilherme/spark'
+if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
+  Sys.setenv(SPARK_HOME = spark_path)
+}
+library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
+sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "3g"))
+
+sqlContext <- sparkR.session(sc)
+sparkR.conf()
+
+```
+
+
+
+```{r}
+
+df <- SparkR::read.df(path = "C:/Guilherme/FGV/Desafios e Requisitos dos Projetos Analiticos/EFC_WAYSIDES.csv",
+                        header='true', source = "com.databricks.spark.csv", inferSchema='true')
+
+
+#read.df(sqlContext,)
+
+#persist(df,"DISK_ONLY")
+#cache(df) == persist(df,"MEMORY_ONLY")
+#cacheTable(sqlContext,"tableNmae")
+
+```
+
+
+
+```{r}
+
+printSchema(df)
+
+df %>% head()
+df %>% nrow()
+df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
+
+
+rdf <- collect(df_sample)
+
+collect(df_sample) %>% 
+  #mutate(friso_baixo=ifelse(ESPESSURA_FRISO_RODA<26,"Baixo","OK"))%>% 
+  ggplot(aes(x=ESPESSURA_FRISO_RODA,y=CAVA_RODA))+
+  geom_point()
+
+#Nomeando uma tabela
+createOrReplaceTempView(df, "tabela")
+
+#Não será executada a consulta
+sdf <- sql("SELECT DATA_HORA_LEITURA  FROM tabela limit 1000")
+
+#Para ter as primeiras linhas
+SparkR::head(sdf)
+
+#Para executar toda a consulta
+#O resultado será um datafra em R. Ou seja, aqui fazemos uma "conversão".
+#collect(sdf)
+
+
+
+df_list <- randomSplit(sdf, c(7,3), 2)
+df_train <- df_list[[1]]
+df_test <- df_list[[2]]
+
+#model <- spark.glm(df_train, ESPESSURA_FRISO_RODA ~., family = "gaussian")
+
+
+
+
+# collect(df)
+# 
+# DataExplorer::plot_intro(
+#   df, 
+#   ggtheme = theme_bw(),
+#   theme_config = theme(legend.position = "bottom")
+# )
+# 
+# 
+# library(visdat)
+# df %>% 
+# vis_dat( sort_type = TRUE,warn_large_data = FALSE)
+
+
+df %>% select("CODIGO_RODEIRO") %>% head()
+
+
+
+# df_list <- randomSplit(sdf, c(7,3), 2)
+# df_train <- df_list[[1]]
+# df_test <- df_list[[2]]
+# 
+# model <- spark.glm(df_train, GENDER ~., family = "gaussian")
+# 
+# summary(model)
+# 
+# predictions_1 <- predict(model, df_train)
+# local_df <- collect(predictions_1)
+# p = local_df$label-local_df$prediction
+# mse = mean((p)^2)
+# mae = mean(abs(p))
+# rmse = sqrt(mse)
+# R2 = 1-(sum((p)^2)/sum((local_df$label-mean(local_df$label))^2))
+# print("Métricas de avaliação da base de Treino")
+# sprintf(" MAE: %.2f", mae)
+# sprintf("MSE: %.2f", mse)
+# sprintf("RMSE: %.2f", rmse)
+# sprintf("R2: %.4f", R2)
+
+```
+
+
+
+
+
