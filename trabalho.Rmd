@@ -11,42 +11,79 @@ output:
             collapsed: yes
             smooth_scroll: yes
 ---
+<left>
+
+![](simbolo_fgv.png)
+
 Turma: **FGV TBABD-8**  
 Professor: **Rafael Lychowski**  
-Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez**  
+Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez** 
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 10, warning = F, error = F)
 ```
 
+### Metodologia utilizada
 
+Utilizaremos para a realização deste trabalho a metodologia CRISP-DM
+
+<center>
+
+![](crisp-dm.png)
+
+### Entendimento do Negócio
+
+A Vale pretende prever o desgaste de rodas de vagões e fornecer uma visão futura da frota de rodeiros, para melhor planejamento de menutanção e compra de componentes. 
+
+**Problema:** Prever se o friso da roda estaá abaixo de 26 mm na próxima leitura.
+
+1. A área não tem visibilidade do que vai contecer com o ativos, antecipando as trocas;
+2. A cada troca o rodeiro é usinado, e sua vida útil reduzida;
+3. Incapacidade de visuzalização de desgastes acelerados em toda a frota de vagões
+4. Muitos vagões apresentam reinciência de trocas, e os fatores não são bem claros;
+
+* Base de dados: EFC_WAYSIDES.csv
+* Variável dependente: ESPESSURA_FRISO_RODA
+* Método: Supervisionado
+* Submétodo: Classificação
+* Objetivo: Identificar quais os frisos terão menos que 26 cm de friso no próximo ciclo.
+
+### Entendimento dos Dados
 
 ```{r include=FALSE}
+# Importar bibliotecas que serão utilizadas no trabalho
+
 library(caret)
 library(mlbench)
 library(dplyr)
 library(tidyverse)
+library(SparkR)
 
+# Iniciar sessão do SPARK
 
-spark_path <-'C:/Guilherme/spark'
+spark_path <-"C:/spark-3.1.2-bin-hadoop3.2"
 if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
   Sys.setenv(SPARK_HOME = spark_path)
 }
-library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
-sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "3g"))
+sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "6g"))
 
 sqlContext <- sparkR.session(sc)
 sparkR.conf()
 
 ```
 
-
-
 ```{r}
+# Importar dataset 
 
-df <- SparkR::read.df(path = "C:/Guilherme/FGV/Desafios e Requisitos dos Projetos Analiticos/EFC_WAYSIDES.csv",
-                        header='true', source = "com.databricks.spark.csv", inferSchema='true')
+pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
 
+df <- SparkR::read.df(path = pathfile,
+                      header='true', 
+                      source = "com.databricks.spark.csv", 
+                      inferSchema='true')
+
+head(df)
 
 #read.df(sqlContext,)
 
@@ -56,7 +93,15 @@ df <- SparkR::read.df(path = "C:/Guilherme/FGV/Desafios e Requisitos dos Projeto
 
 ```
 
+#### Verificação da qualidade dos Dados
+##### Verificar a existencia de dados faltantes
+##### Verificar se os dados estão com o tipo correto
+##### Verificar outliers
+##### Eliminar redundancias
 
+#### Identificar as principais estatisticas da Amostra
+#### Identificar as principais correlações entre os dados
+#### Construir visualizações
 
 ```{r}
 
@@ -140,6 +185,20 @@ df %>% select("CODIGO_RODEIRO") %>% head()
 ```
 
 
+### Preparação dos Dados
 
+#### Normalizaçao?
+#### PCA/Redução de dimensionalidade
 
+### Modelagem
+
+#### Classificação
+##### Regressão logística
+##### Árvore de decisão
+##### Redes neurais
+##### Ensemble?
+
+### Avaliação
+
+### Conclusão
 
