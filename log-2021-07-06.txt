@@ -1,0 +1,2 @@
+1. Alterei a inicialização para arquivos genéricos - choose.dir()
+2. Criei um projeto para facilitar a inicialização
