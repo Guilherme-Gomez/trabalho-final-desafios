@@ -11,79 +11,44 @@ output:
             collapsed: yes
             smooth_scroll: yes
 ---
-<left>
-
-![](simbolo_fgv.png)
-
 Turma: **FGV TBABD-8**  
 Professor: **Rafael Lychowski**  
-Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez** 
-
+Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez**  
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 10, warning = F, error = F)
 ```
 
-### Metodologia utilizada
 
-Utilizaremos para a realização deste trabalho a metodologia CRISP-DM
-
-<center>
-
-![](crisp-dm.png)
-
-### Entendimento do Negócio
-
-A Vale pretende prever o desgaste de rodas de vagões e fornecer uma visão futura da frota de rodeiros, para melhor planejamento de menutanção e compra de componentes. 
-
-**Problema:** Prever se o friso da roda estaá abaixo de 26 mm na próxima leitura.
-
-1. A área não tem visibilidade do que vai contecer com o ativos, antecipando as trocas;
-2. A cada troca o rodeiro é usinado, e sua vida útil reduzida;
-3. Incapacidade de visuzalização de desgastes acelerados em toda a frota de vagões
-4. Muitos vagões apresentam reinciência de trocas, e os fatores não são bem claros;
-
-* Base de dados: EFC_WAYSIDES.csv
-* Variável dependente: ESPESSURA_FRISO_RODA
-* Método: Supervisionado
-* Submétodo: Classificação
-* Objetivo: Identificar quais os frisos terão menos que 26 cm de friso no próximo ciclo.
-
-### Entendimento dos Dados
 
 ```{r include=FALSE}
-# Importar bibliotecas que serão utilizadas no trabalho
-
 library(caret)
 library(mlbench)
 library(dplyr)
 library(tidyverse)
-library(SparkR)
+library(gridExtra)
 
-# Iniciar sessão do SPARK
-
-spark_path <-"C:/spark-3.1.2-bin-hadoop3.2"
+spark_path <-'C:/Guilherme/spark'
 if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
   Sys.setenv(SPARK_HOME = spark_path)
 }
-sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "6g"))
+library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
+sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "3g"))
 
 sqlContext <- sparkR.session(sc)
 sparkR.conf()
 
 ```
 
+
+
 ```{r}
-# Importar dataset 
 
-pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
+df <- SparkR::read.df(path = "C:/Guilherme/FGV/Desafios e Requisitos dos Projetos Analiticos/EFC_WAYSIDES.csv",
+                        header='true', source = "com.databricks.spark.csv", inferSchema='true')
 
-df <- SparkR::read.df(path = pathfile,
-                      header='true', 
-                      source = "com.databricks.spark.csv", 
-                      inferSchema='true')
 
-head(df)
+df$friso_baixo <- SparkR::ifelse(df$ALTURA_FRISO_RODA<26,1,0)
 
 #read.df(sqlContext,)
 
@@ -93,15 +58,7 @@ head(df)
 
 ```
 
-#### Verificação da qualidade dos Dados
-##### Verificar a existencia de dados faltantes
-##### Verificar se os dados estão com o tipo correto
-##### Verificar outliers
-##### Eliminar redundancias
 
-#### Identificar as principais estatisticas da Amostra
-#### Identificar as principais correlações entre os dados
-#### Construir visualizações
 
 ```{r}
 
@@ -111,8 +68,10 @@ df %>% head()
 df %>% nrow()
 df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
 
+createOrReplaceTempView(df, "tabela")
+createOrReplaceTempView(df_sample, "tabela_samples")
 
-rdf <- collect(df_sample)
+#rdf <- collect(df_sample)
 
 collect(df_sample) %>% 
   #mutate(friso_baixo=ifelse(ESPESSURA_FRISO_RODA<26,"Baixo","OK"))%>% 
@@ -120,10 +79,26 @@ collect(df_sample) %>%
   geom_point()
 
 #Nomeando uma tabela
-createOrReplaceTempView(df, "tabela")
 
-#Não será executada a consulta
+
+#Não será executada a consulta, apenas cria o schema.
 sdf <- sql("SELECT DATA_HORA_LEITURA  FROM tabela limit 1000")
+
+sdf_medicoes_dia <- sql("select  CAST(DATA_HORA_LEITURA AS DATE),COUNT(*) from tabela GROUP BY CAST(DATA_HORA_LEITURA AS DATE) ORDER BY CAST(DATA_HORA_LEITURA AS DATE)") 
+
+sdf_medicoes_dia_samples <- sql("select  CAST(DATA_HORA_LEITURA AS DATE),COUNT(*) from tabela_samples GROUP BY CAST(DATA_HORA_LEITURA AS DATE) ORDER BY CAST(DATA_HORA_LEITURA AS DATE)") 
+
+
+TOTAL_DIA <- collect(sdf_medicoes_dia)
+g1 <- TOTAL_DIA %>% ggplot(aes(x=DATA_HORA_LEITURA, y= `count(1)`))+
+              geom_line()
+
+TOTAL_DIA_samples <- collect(sdf_medicoes_dia_samples)
+g2 <- TOTAL_DIA_samples %>% ggplot(aes(x=DATA_HORA_LEITURA, y= `count(1)`))+
+              geom_line()
+
+grid.arrange(g1,g2,ncol = 1)
+
 
 #Para ter as primeiras linhas
 SparkR::head(sdf)
@@ -159,6 +134,28 @@ df_test <- df_list[[2]]
 
 df %>% select("CODIGO_RODEIRO") %>% head()
 
+#Filtrando apenas os frisos abaixo de 26mm.
+SparkR::subset(df,df$friso_baixo %in% c(1),1:27) %>% head(200)
+
+sql("select  
+    * 
+    from tabela 
+    where friso_baixo ==1 
+    order by CODIGO_RODA") %>% 
+  head(200) %>% View()
+
+
+#Identificando as rodas que tiveram em algum momeno o friso baixo.
+
+sdf_rodas_friso_baixo <- sql("select  
+    CODIGO_RODA
+    from tabela 
+    where friso_baixo ==1 
+    group by CODIGO_RODA")
+
+lista_rodas_friso_baixo <- collect(sdf_rodas_friso_baixo)
+
+select(df,df$CODIGO_RODA %in% lista_rodas_friso_baixo)
 
 
 # df_list <- randomSplit(sdf, c(7,3), 2)
@@ -185,20 +182,110 @@ df %>% select("CODIGO_RODEIRO") %>% head()
 ```
 
 
-### Preparação dos Dados
 
-#### Normalizaçao?
-#### PCA/Redução de dimensionalidade
 
-### Modelagem
+```{r echo=FALSE}
 
-#### Classificação
-##### Regressão logística
-##### Árvore de decisão
-##### Redes neurais
-##### Ensemble?
+# "ROW_ID"                                
+# "DATA_HORA_LEITURA"                     
+# "CODIGO_VAGAO"                          
+# "CODIGO_RODEIRO"                        
+# "CODIGO_RODA"                           
+# "LADO_RODA"                             
+# "EIXO_VAGAO"                            
+# "CICLO_RODEIRO"                         
+# "TRAIN_ID"                              
+# "SENTIDO_TREM"                          
+# "VELOCIDADE_ENTRADA_TREM"               
+# "VELOCIDADE_SAIDA_TREM"                 
+# "POSICAO_VAGAO_COMPOSICAO"              
+# "ANGULO_FRISO_RODA"                     
+# "ALTURA_FRISO_RODA"                     
+# "ESPESSURA_FRISO_RODA"                  
+# "CAVA_RODA"                             
+# "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"     
+# "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE"    
+# "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE" 
+# "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE"
+# "ROTACAO_EIXO"                          
+# "ALINHAMENTO_ENTRE_EIXOS_(IAM)"         
+# "DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)"      
+# "TRACKING_ERROR_(TE)"                   
+# "SERPENTEAMENTO_(HUNTING)"    
 
-### Avaliação
 
-### Conclusão
+createOrReplaceTempView(df, "tabela_samples")
+sql("select * from tabela_samples") %>% head(10)
+
+
+sql("select  friso_baixo, count(*) from tabela_samples group by friso_baixo") %>% head(10)
+sql("select  friso_baixo, count(*) from tabela group by friso_baixo") %>% head(10)
+
+sql("select CODIGO_VAGAO,count(*) from tabela_samples group by CODIGO_VAGAO") %>% head(10)
+
+sql("select  DATA_HORA_LEITURA, count(*), max(DATA_HORA_LEITURA),min(DATA_HORA_LEITURA) from tabela_samples group by DATA_HORA_LEITURA") %>% head(10)
+
+sql("select  min(DATA_HORA_LEITURA),max(DATA_HORA_LEITURA) from tabela_samples") %>% head(10)
+
+sql("select  min(CAST(DATA_HORA_LEITURA AS DATE)),max(CAST(DATA_HORA_LEITURA AS DATE)) from tabela_samples") %>% head(10)
+
+
+sql("select  CAST(DATA_HORA_LEITURA AS DATE),COUNT(*) from tabela_samples GROUP BY CAST(DATA_HORA_LEITURA AS DATE) ORDER BY CAST(DATA_HORA_LEITURA AS DATE)") %>% head(50)
+
+sql("select  CODIGO_VAGAO, count(*) from tabela_samples group by CODIGO_VAGAO") %>% head(10)
+
+sql("select  CODIGO_RODEIRO, count(*) from tabela_samples group by CODIGO_RODEIRO") %>% head(10)
+
+sql("select  CODIGO_RODA, count(*) from tabela_samples group by CODIGO_RODA") %>% head(10)
+
+sql("select  LADO_RODA, count(*) from tabela_samples group by LADO_RODA") %>% head(10)
+
+sql("select  EIXO_VAGAO, count(*) from tabela_samples group by EIXO_VAGAO") %>% head(10)
+
+sql("select  CICLO_RODEIRO, count(*) from tabela_samples group by CICLO_RODEIRO") %>% head(10)
+
+sql("select  TRAIN_ID, count(*) from tabela_samples group by TRAIN_ID") %>% head(10)
+
+sql("select  SENTIDO_TREM, count(*) from tabela_samples group by SENTIDO_TREM") %>% head(10)
+
+sql("select  VELOCIDADE_ENTRADA_TREM, count(*) from tabela_samples group by VELOCIDADE_ENTRADA_TREM ") %>% head(10)
+
+sql("select  VELOCIDADE_SAIDA_TREM, count(*) from tabela_samples group by VELOCIDADE_SAIDA_TREM") %>% head(10)
+
+sql("select  POSICAO_VAGAO_COMPOSICAO, count(*) from tabela_samples group by POSICAO_VAGAO_COMPOSICAO") %>% head(10)
+
+sql("select  ANGULO_FRISO_RODA, count(*) from tabela_samples group by ANGULO_FRISO_RODA") %>% head(10)
+
+sql("select  ALTURA_FRISO_RODA, count(*) from tabela_samples group by ALTURA_FRISO_RODA") %>% head(10)
+
+sql("select  ESPESSURA_FRISO_RODA, count(*) from tabela_samples group by ESPESSURA_FRISO_RODA") %>% head(10)
+
+sql("select  CAVA_RODA, count(*) from tabela_samples group by CAVA_RODA") %>% head(10)
+
+sql("select  ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, count(*) from tabela_samples group by ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE") %>% head(10)
+
+sql("select  ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, count(*) from tabela_samples group by ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE") %>% head(10)
+
+sql("select  TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, count(*) from tabela_samples group by TRACKING_POSITION_EIXO_FRONTAL_TRUQUE") %>% head(10)
+
+sql("select  TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE, count(*) from tabela_samples group by TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE") %>% head(10)
+
+sql("select  ROTACAO_EIXO, count(*) from tabela_samples group by ROTACAO_EIXO") %>% head(10)
+
+sql("select  `ALINHAMENTO_ENTRE_EIXOS_(IAM)`, count(*) from tabela_samples group by `ALINHAMENTO_ENTRE_EIXOS_(IAM)`") %>% head(10)
+
+sql("select  `DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)`, count(*) from tabela_samples group by `DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)`") %>% head(10)
+
+sql("select  `TRACKING_ERROR_(TE)`, count(*) from tabela_samples group by `TRACKING_ERROR_(TE)`") %>% head(10)
+
+sql("select  `SERPENTEAMENTO_(HUNTING)`, count(*) from tabela_samples group by `SERPENTEAMENTO_(HUNTING)`") %>% head(10)
+
+
+#sdf <- sql("SELECT DATA_HORA_LEITURA  FROM tabela limit 1000")
+
+
+
+```
+
+
 
