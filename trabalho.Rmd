@@ -33,7 +33,8 @@ if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
   Sys.setenv(SPARK_HOME = spark_path)
 }
 library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
-sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "3g"))
+
+sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "2g"))
 
 sqlContext <- sparkR.session(sc)
 sparkR.conf()
@@ -153,9 +154,13 @@ sdf_rodas_friso_baixo <- sql("select
     where friso_baixo ==1 
     group by CODIGO_RODA")
 
-lista_rodas_friso_baixo <- collect(sdf_rodas_friso_baixo)
+lista_rodas_friso_baixo <- (collect(sdf_rodas_friso_baixo))
 
-select(df,df$CODIGO_RODA %in% lista_rodas_friso_baixo)
+#Não consigo fazer esse filtro.
+
+sql(paste("select * from tabela where CODIGO_RODA in", lista_rodas_friso_baixo,collapse = ","))
+
+
 
 
 # df_list <- randomSplit(sdf, c(7,3), 2)
