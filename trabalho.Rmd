@@ -81,21 +81,189 @@ pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
 df <- SparkR::read.df(path = pathfile,
                       header='true', 
                       source = "com.databricks.spark.csv", 
-                      inferSchema='true')
+                      inferSchema='true',
+                      na.strings = "")
 
 head(df)
-
+cache(df)
 #read.df(sqlContext,)
 
-#persist(df,"DISK_ONLY")
+# Incluir o arquivo na memória para facilitar a interação
+persist(df,"MEMORY_ONLY")
+
 #cache(df) == persist(df,"MEMORY_ONLY")
 #cacheTable(sqlContext,"tableNmae")
 
 ```
 
 #### Verificação da qualidade dos Dados
+
+```{r}
+"Verificando o 'Schema' dos dados"
+printSchema(df)
+
+```
+
 ##### Verificar a existencia de dados faltantes
-##### Verificar se os dados estão com o tipo correto
+
+```{r include=FALSE}
+
+#Visualizando uma amostra de dados
+SparkR::head(df,32)
+#dtypes(df)
+
+#Verificando valores faltantes no df
+ncol_df <- ncol(df)
+ncol_df
+
+columns(df)
+col_name <- 0
+is_Null <- 0
+col_class <- 0
+
+# "ROW_ID" "int""
+df_ROW_ID_Null <- where(df, isNull(df$ROW_ID))
+
+# "DATA_HORA_LEITURA" "string"" -> Date
+df_DATA_HORA_LEITURA_Null <- where(df, df$DATA_HORA_LEITURA=="")
+
+# "CODIGO_VAGAO" "int"" -> String
+df_CODIGO_VAGAO_Null <- where(df, isNull(df$CODIGO_VAGAO))
+
+# "CODIGO_RODEIRO" "int" -> String         
+df_CODIGO_RODEIRO_Null <- where(df, isNull(df$CODIGO_RODEIRO))
+
+# "CODIGO_RODA" "string"  
+df_CODIGO_RODA_Null <- where(df, df$CODIGO_RODEIRO=="")
+
+# "LADO_RODA" "string"       
+df_LADO_RODA_Null <- where(df, df$LADO_RODA=="")
+
+# "EIXO_VAGAO" "int"       
+df_EIXO_VAGAO_Null <- where(df, isNull(df$EIXO_VAGAO))
+
+# "CICLO_RODEIRO" "string"       
+df_CICLO_RODEIRO_Null <- where(df, df$CICLO_RODEIRO=="")
+
+# "TRAIN_ID" "string"  
+df_TRAIN_ID_Null <- where(df, df$TRAIN_ID=="")
+
+# "SENTIDO_TREM" "string"      
+df_SENTIDO_TREM_Null <- where(df, df$SENTIDO_TREM=="")
+
+# "VELOCIDADE_ENTRADA_TREM" "int"                    
+df_VELOCIDADE_ENTRADA_TREM_Null <- where(df, isNull(df$VELOCIDADE_ENTRADA_TREM))
+
+# "VELOCIDADE_SAIDA_TREM" "int"                  
+df_VELOCIDADE_SAIDA_TREM_Null <- where(df, isNull(df$VELOCIDADE_SAIDA_TREM))
+
+# "POSICAO_VAGAO_COMPOSICAO" "int"                     
+df_POSICAO_VAGAO_COMPOSICAO_Null <- where(df, isNull(df$POSICAO_VAGAO_COMPOSICAO))
+
+# "ANGULO_FRISO_RODA" "string" -> int           
+df_ANGULO_FRISO_RODA_Null <- where(df, df$ANGULO_FRISO_RODA=="")
+
+# "ALTURA_FRISO_RODA" "string" -> int           
+df_ALTURA_FRISO_RODA_Null <- where(df, df$ALTURA_FRISO_RODA=="")
+
+# "ESPESSURA_FRISO_RODA" "string" - int       
+df_ESPESSURA_FRISO_RODA_Null <- where(df, df$ESPESSURA_FRISO_RODA=="")
+
+# "CAVA_RODA" "string" - int   
+df_CAVA_RODA_Null <- where(df, df$CAVA_RODA=="")
+
+# "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE" "string" - int
+df_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_Null <- where(df, df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE=="")
+
+# "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE" "string" - int
+df_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_Null <- where(df, df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE=="")
+
+# "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE" "string" - int
+df_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_Null <- where(df, df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE=="")
+
+# "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE" "string" - int
+df_TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE_Null <- where(df, df$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE=="")
+
+# "ROTACAO_EIXO" "string" - int
+df_ROTACAO_EIXO_Null <- where(df, df$ROTACAO_EIXO=="")
+
+# "ALINHAMENTO_ENTRE_EIXOS_IAM" "string" - int                       
+df_ALINHAMENTO_ENTRE_EIXOS_IAM_Null <- where(df, df$`ALINHAMENTO_ENTRE_EIXOS_(IAM)`=="")
+
+# "DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)" "string" - int                          
+df_DESLOCAMENTO_ENTRE_EIXOS_SHIFT_Null <- where(df, df$`DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)`=="")
+
+# "TRACKING_ERROR_(TE)" "string" - int
+df_TRACKING_ERROR_TE_Null <- where(df, df$`TRACKING_ERROR_(TE)`=="")
+
+# "SERPENTEAMENTO_(HUNTING)" "int"                   
+df_SERPENTEAMENTO_HUNTING_Null <- where(df, df$`SERPENTEAMENTO_(HUNTING)`=="")
+
+col_names <- columns(df)
+
+is_null <- c(count(df_ROW_ID_Null),
+             count(df_DATA_HORA_LEITURA_Null),
+             count(df_CODIGO_VAGAO_Null),
+             count(df_CODIGO_RODEIRO_Null),
+             count(df_CODIGO_RODA_Null),
+             count(df_LADO_RODA_Null),
+             count(df_EIXO_VAGAO_Null),
+             count(df_CICLO_RODEIRO_Null),
+             count(df_TRAIN_ID_Null),
+             count(df_SENTIDO_TREM_Null),
+             count(df_VELOCIDADE_ENTRADA_TREM_Null),
+             count(df_VELOCIDADE_SAIDA_TREM_Null),
+             count(df_POSICAO_VAGAO_COMPOSICAO_Null),
+             count(df_ANGULO_FRISO_RODA_Null),
+             count(df_ALTURA_FRISO_RODA_Null),
+             count(df_ESPESSURA_FRISO_RODA_Null),
+             count(df_CAVA_RODA_Null),
+             count(df_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_Null),
+             count(df_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_Null),
+             count(df_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_Null),
+             count(df_TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE_Null),
+             count(df_ROTACAO_EIXO_Null),
+             count(df_ALINHAMENTO_ENTRE_EIXOS_IAM_Null),
+             count(df_DESLOCAMENTO_ENTRE_EIXOS_SHIFT_Null),
+             count(df_TRACKING_ERROR_TE_Null),
+             count(df_SERPENTEAMENTO_HUNTING_Null))
+
+data_type_after <- 0
+for (i in 1:ncol_df){
+  data_type_after[i] <- dtypes(df)[[i]][2]
+  print(dtypes(df)[[i]][2])
+}
+
+analise_das_variaveis <- data.frame(col_names, is_null, data_type_after)
+colnames(analise_das_variaveis) <- c("Variável",
+"Qtd de dados Nulos", "Tipo de dado antes")
+analise_das_variaveis
+```
+
+```{r table}
+knitr::kable(analise_das_variaveis, caption = "Análise preliminar das variáveis do problema")
+```
+
+##### Ajustar os dados estão com o tipo incorreto
+
+```{r}
+# Variáveis que necessitam de transformação
+
+# "DATA_HORA_LEITURA" "string"" -> Date
+# "CODIGO_VAGAO" "int"" -> String
+# "CODIGO_RODEIRO" "int" -> String   
+# "ANGULO_FRISO_RODA" "string" -> Int
+# "ALTURA_FRISO_RODA" "string" -> int  
+# "ESPESSURA_FRISO_RODA" "string" - int  
+# "CAVA_RODA" "string" - int  
+# "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE" "string" - "int"  
+# "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE" "string" - int
+# "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE" "string" - int
+# "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE" "string" - int
+# "ROTACAO_EIXO" "string" - int
+
+```
+
 ##### Verificar outliers
 ##### Eliminar redundancias
 
