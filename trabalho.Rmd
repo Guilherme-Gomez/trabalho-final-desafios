@@ -106,6 +106,8 @@ printSchema(df)
 
 ##### Verificar a existencia de dados faltantes
 
+Foi verificado que nenhuma variável possui valores faltantes (Null, NaN, etc). Algumas variáveis possuem tipo incorreto ao apresentado na proposição do problema.
+
 ```{r include=FALSE}
 
 #Visualizando uma amostra de dados
@@ -240,115 +242,108 @@ colnames(analise_das_variaveis) <- c("Variável",
 analise_das_variaveis
 ```
 
-```{r table}
-knitr::kable(analise_das_variaveis, caption = "Análise preliminar das variáveis do problema")
-```
-
 ##### Ajustar os dados estão com o tipo incorreto
 
-```{r}
+```{r include=FALSE}
 # Variáveis que necessitam de transformação
 
-# "DATA_HORA_LEITURA" "string"" -> Date
+str(df)
+
 # "CODIGO_VAGAO" "int"" -> String
+df$CODIGO_VAGAO <- cast(df$CODIGO_VAGAO, dataType = "string")
+
 # "CODIGO_RODEIRO" "int" -> String   
+df$CODIGO_RODEIRO <- cast(df$CODIGO_RODEIRO, dataType = "string")
+
 # "ANGULO_FRISO_RODA" "string" -> Int
+df$ANGULO_FRISO_RODA <- cast(df$ANGULO_FRISO_RODA, dataType = "integer")
+
 # "ALTURA_FRISO_RODA" "string" -> int  
-# "ESPESSURA_FRISO_RODA" "string" - int  
+df$ALTURA_FRISO_RODA <- cast(df$ALTURA_FRISO_RODA, dataType = "integer")
+
+# "ESPESSURA_FRISO_RODA" "string" - int
+df$ESPESSURA_FRISO_RODA <- cast(df$ESPESSURA_FRISO_RODA, dataType = "integer")
+
 # "CAVA_RODA" "string" - int  
+df$CAVA_RODA <- cast(df$CAVA_RODA, dataType = "integer")
+
 # "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE" "string" - "int"  
+df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE <- cast(df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, dataType = "integer")
+
 # "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE" "string" - int
+df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE <- cast(df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, dataType = "integer")
+
 # "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE" "string" - int
+df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE <- cast(df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, dataType = "integer")
+
 # "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE" "string" - int
+df$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE <- cast(df$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE, dataType = "integer")
+
 # "ROTACAO_EIXO" "string" - int
+df$ROTACAO_EIXO <- cast(df$ROTACAO_EIXO, dataType = "integer")
+
+# "DATA_HORA_LEITURA" "string"" -> Date
+data_hora_leitura_uts <- unix_timestamp(df$DATA_HORA_LEITURA, 'MM/dd/yyyy')
+data_hora_leitura_ts <- cast(data_hora_leitura_uts, 'timestamp')
+data_hora_leitura_dt <- cast(data_hora_leitura_ts, 'date')
+df <- withColumn(df,'DATA_HORA_LEITURA_dt',data_hora_leitura_dt)
+
+data_type_before <- 0
+for (i in 1:ncol_df){
+  data_type_before[i] <- dtypes(df)[[i]][2]
+  print(dtypes(df)[[i]][2])
+}
+
+analise_das_variaveis <- data.frame(col_names, is_null, data_type_after, data_type_before)
+colnames(analise_das_variaveis) <- c("Variável",
+"Qtd de dados Nulos", "Tipo de dado antes","Tipo de dado depois")
+analise_das_variaveis
+```
+
+```{r table}
+knitr::kable(analise_das_variaveis, caption = "Análise e conversão das variáveis do problema")
+```
+
+#### Identificar as principais estatisticas da Amostra
+
+
+```{r}
+sumstats1 <- describe(df, "EIXO_VAGAO",
+                     "VELOCIDADE_ENTRADA_TREM",
+                     "VELOCIDADE_SAIDA_TREM")
+sumstats2 <- describe(df, "POSICAO_VAGAO_COMPOSICAO",
+                     "ANGULO_FRISO_RODA",
+                     "ALTURA_FRISO_RODA")
+sumstats3 <- describe(df, "ESPESSURA_FRISO_RODA",
+                     "CAVA_RODA",
+                     "ROTACAO_EIXO")
+sumstats4 <- describe(df, "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE",
+                     "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE")
+sumstats5 <- describe(df, "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE")
+sumstats6 <- describe(df, "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE")
+showDF(sumstats1)
+showDF(sumstats2)
+showDF(sumstats3)
+showDF(sumstats4)
+showDF(sumstats5)
+showDF(sumstats6)
+```
+
+#### Identificar as principais correlações entre os dados
+
+```{r}
+# Medindo a correlação entre ESPESSURA FRISO RODA E EIXO VAGAO
+corr_EFR_EV <- corr(df, "ESPESSURA_FRISO_RODA", "EIXO_VAGAO")
+corr_EFR_EV
+
 
 ```
 
-##### Verificar outliers
-##### Eliminar redundancias
-
-#### Identificar as principais estatisticas da Amostra
-#### Identificar as principais correlações entre os dados
 #### Construir visualizações
 
 ```{r}
 
-printSchema(df)
 
-df %>% head()
-df %>% nrow()
-df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
-
-
-rdf <- collect(df_sample)
-
-collect(df_sample) %>% 
-  #mutate(friso_baixo=ifelse(ESPESSURA_FRISO_RODA<26,"Baixo","OK"))%>% 
-  ggplot(aes(x=ESPESSURA_FRISO_RODA,y=CAVA_RODA))+
-  geom_point()
-
-#Nomeando uma tabela
-createOrReplaceTempView(df, "tabela")
-
-#Não será executada a consulta
-sdf <- sql("SELECT DATA_HORA_LEITURA  FROM tabela limit 1000")
-
-#Para ter as primeiras linhas
-SparkR::head(sdf)
-
-#Para executar toda a consulta
-#O resultado será um datafra em R. Ou seja, aqui fazemos uma "conversão".
-#collect(sdf)
-
-
-
-df_list <- randomSplit(sdf, c(7,3), 2)
-df_train <- df_list[[1]]
-df_test <- df_list[[2]]
-
-#model <- spark.glm(df_train, ESPESSURA_FRISO_RODA ~., family = "gaussian")
-
-
-
-
-# collect(df)
-# 
-# DataExplorer::plot_intro(
-#   df, 
-#   ggtheme = theme_bw(),
-#   theme_config = theme(legend.position = "bottom")
-# )
-# 
-# 
-# library(visdat)
-# df %>% 
-# vis_dat( sort_type = TRUE,warn_large_data = FALSE)
-
-
-df %>% select("CODIGO_RODEIRO") %>% head()
-
-
-
-# df_list <- randomSplit(sdf, c(7,3), 2)
-# df_train <- df_list[[1]]
-# df_test <- df_list[[2]]
-# 
-# model <- spark.glm(df_train, GENDER ~., family = "gaussian")
-# 
-# summary(model)
-# 
-# predictions_1 <- predict(model, df_train)
-# local_df <- collect(predictions_1)
-# p = local_df$label-local_df$prediction
-# mse = mean((p)^2)
-# mae = mean(abs(p))
-# rmse = sqrt(mse)
-# R2 = 1-(sum((p)^2)/sum((local_df$label-mean(local_df$label))^2))
-# print("Métricas de avaliação da base de Treino")
-# sprintf(" MAE: %.2f", mae)
-# sprintf("MSE: %.2f", mse)
-# sprintf("RMSE: %.2f", rmse)
-# sprintf("R2: %.4f", R2)
 
 ```
 
