@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE, fig.width = 10, warning = F, error = F)
 
 
 
+
 ```{r include=FALSE}
 library(caret)
 library(mlbench)
@@ -28,6 +29,9 @@ library(dplyr)
 library(tidyverse)
 library(gridExtra)
 library(kableExtra)
+
+library(hrbrthemes)
+library(viridis)
 
 spark_path <-'C:/Guilherme/spark'
 if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
@@ -46,7 +50,6 @@ sqlContext <- sparkR.session(sc)
 sparkR.conf()
 
 ```
-
 
 
 ```{r}
@@ -88,13 +91,15 @@ df <- SparkR::read.df(path = "C:/Guilherme/FGV/Desafios e Requisitos dos Projeto
 
 
 #Criando novas colunas pelo método mais comum.
-df$friso_baixo <- SparkR::ifelse(df$ALTURA_FRISO_RODA<26,1,0)
+df$friso_baixo <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,1,0)
 
 #Criando novas colunas e escolhendo o tipo de dado usanod withColumn.
 df <- df %>% 
   withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date")) #%>% 
   #withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date"))
 
+
+df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
 
 printSchema(df)
 
@@ -105,6 +110,7 @@ printSchema(df)
 #cacheTable(sqlContext,"tableNmae")
 
 ```
+
 
 
 
@@ -250,69 +256,6 @@ cont_prob %>% t() %>%   kable(., format = "html",row.names = T, digits = 2) %>%
 
 
 
-```{r message=FALSE, warning=FALSE}
-#Criando lista de rodas que já estiveram com friso baixo. Usando SQL
-# createOrReplaceTempView(df, "tabela")
-# sdf_rodas_friso_baixo <- sql("select  
-#     CODIGO_RODA
-#     from tabela 
-#     where friso_baixo ==1 
-#     group by CODIGO_RODA")
-# 
-# 
-# sdf_vagoes_friso_baixo <- sql("select  
-#     CODIGO_VAGAO
-#     from tabela 
-#     where friso_baixo ==1 
-#     group by CODIGO_VAGAO")
-# 
-# 
-# 
-# lista_rodas_friso_baixo <- (collect(sdf_rodas_friso_baixo))
-# lista_vagoes_friso_baixo <- (collect(sdf_vagoes_friso_baixo))
-# 
-# 
-# # Exemplo de um vagão que teve uma roda abaixo de 26mm.
-# vagoes <- lista_vagoes_friso_baixo %>% head() %>% as.list()
-# for (vagao in vagoes$CODIGO_VAGAO){
-#   filtro_vagao <- vagao
-#   where(df,df$CODIGO_VAGAO==filtro_vagao)  %>% 
-#   head(10000) %>% 
-#   ggplot(aes(x=DATA_HORA_LEITURA, y=ALTURA_FRISO_RODA))+geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+geom_smooth()+ geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
-# }
-
-
-where(df,df$CODIGO_VAGAO=='97911')  %>%
-  collect(.)%>%
-  ggplot(aes(x=Dia, y=ALTURA_FRISO_RODA))+geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+geom_smooth()+ geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
-
-
-
-where(df,df$CODIGO_VAGAO=='75705')  %>%
-  collect(.)%>%
-  ggplot(aes(x=Dia, y=ALTURA_FRISO_RODA))+geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+geom_smooth()+ geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
-
-
-where(df,df$CODIGO_VAGAO=='557173')  %>%
-  collect(.)%>%
-  ggplot(aes(x=Dia, y=ALTURA_FRISO_RODA))+geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+geom_smooth()+ geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
-
-
-
-where(df,df$CODIGO_VAGAO=='87771')  %>%
-  collect(.)%>%
-  ggplot(aes(x=Dia, y=ALTURA_FRISO_RODA))+geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+geom_smooth()+ geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
-
-
-where(df,df$CODIGO_VAGAO=='632094')  %>%
-  collect(.)%>%
-  ggplot(aes(x=Dia, y=ALTURA_FRISO_RODA))+geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+geom_smooth()+ geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
-
-
-
-```
-
-
 ```{r echo=FALSE}
 #Usando a função agg
 
@@ -321,10 +264,10 @@ agg(df, velo_entrada_sd = sd(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
 agg(df, velo_entrada_var = var(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
 agg(df, velo_entrada_max = max(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
 
-agg(df, alt_friso_avg = avg(df$ALTURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_sd = sd(df$ALTURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_var = var(df$ALTURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_max = max(df$ALTURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_avg = avg(df$ESPESSURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_sd = sd(df$ESPESSURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_var = var(df$ESPESSURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_max = max(df$ESPESSURA_FRISO_RODA)) %>% head()
 
 
 #Usando agg com agregação
@@ -338,102 +281,150 @@ head(df2)
 
 
 
-```{r eval=FALSE, include=FALSE}
+Listados com top 10
 
-df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
+```{r}
 
 createOrReplaceTempView(df, "tabela")
-createOrReplaceTempView(df_sample, "tabela_samples")
 
-#rdf <- collect(df_sample)
+sdf_vagao_trocas_roda <- sql("select
+    CODIGO_VAGAO
+    ,count(*) qtd
 
-collect(df_sample) %>% 
-  #mutate(friso_baixo=ifelse(ESPESSURA_FRISO_RODA<26,"Baixo","OK"))%>% 
-  ggplot(aes(x=ESPESSURA_FRISO_RODA,y=CAVA_RODA))+
-  geom_point()
-
-#Nomeando uma tabela
-
-
-#Não será executada a consulta, apenas cria o schema.
-sdf <- sql("SELECT DATA_HORA_LEITURA  FROM tabela limit 1000")
-
-sdf_medicoes_dia <- sql("select  CAST(DATA_HORA_LEITURA AS DATE),COUNT(*) from tabela GROUP BY CAST(DATA_HORA_LEITURA AS DATE) ORDER BY CAST(DATA_HORA_LEITURA AS DATE)") 
-
-sdf_medicoes_dia_samples <- sql("select  CAST(DATA_HORA_LEITURA AS DATE),COUNT(*) from tabela_samples GROUP BY CAST(DATA_HORA_LEITURA AS DATE) ORDER BY CAST(DATA_HORA_LEITURA AS DATE)") 
+    from tabela
+    where CODIGO_RODA != CICLO_RODEIRO
+          and
+          CODIGO_VAGAO in 
+              (select
+                  CODIGO_VAGAO
+                      from tabela
+                    where friso_baixo ==1
+                    group by CODIGO_VAGAO)
 
 
-TOTAL_DIA <- collect(sdf_medicoes_dia)
-g1 <- TOTAL_DIA %>% ggplot(aes(x=DATA_HORA_LEITURA, y= `count(1)`))+
-              geom_line()
+    group by CODIGO_VAGAO
+    order by qtd desc
 
-TOTAL_DIA_samples <- collect(sdf_medicoes_dia_samples)
-g2 <- TOTAL_DIA_samples %>% ggplot(aes(x=DATA_HORA_LEITURA, y= `count(1)`))+
-              geom_line()
-
-grid.arrange(g1,g2,ncol = 1)
-
-
-#Para ter as primeiras linhas
-SparkR::head(sdf)
-
-#Para executar toda a consulta
-#O resultado será um datafra em R. Ou seja, aqui fazemos uma "conversão".
-#collect(sdf)
+    "
+    
+    )
 
 
 
+sdf_vagao_trocas_roda_all <- sql(
+"
+  select
+    *
+  from
+  tabela
+  
+  where CODIGO_VAGAO in
+  (
+  select
+    CODIGO_VAGAO
+    
+      from tabela
+    where CODIGO_RODA != CICLO_RODEIRO
+          and
+          CODIGO_VAGAO in 
+              (select
+                  CODIGO_VAGAO
+                      from tabela
+                    where friso_baixo ==1
+                    group by CODIGO_VAGAO)
+
+
+    group by CODIGO_VAGAO
+  )
+  
+  "
+)
+
+
+
+
+
+
+lista_vagoes_troca_friso_baixo <- sdf_vagao_trocas_roda %>% head(1000)
+
+
+vagoes <- lista_vagoes_troca_friso_baixo %>% head(10) %>% as.list()
+
+myplots <- list()
+n <- 1
+for (vagao in vagoes$CODIGO_VAGAO){
+  filtro_vagao <- vagao
+  g1 <- 
+    where(df,df$CODIGO_VAGAO==filtro_vagao)  %>%
+    head(10000) %>%
+    ggplot(aes(x=Dia, y=ESPESSURA_FRISO_RODA,color=CICLO_RODEIRO))+
+    geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+
+    scale_y_continuous(limits = c(18,38))+
+    geom_smooth()+
+    geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)+
+    theme(legend.position="none")
+  
+  myplots[[n]] <- g1
+  n <- n+1
+  print(g1)
+}
+
+
+
+# where(df,df$CODIGO_VAGAO=='69632')%>%
+#   collect(.)%>%
+#   ggplot(aes(x=Dia, y=ESPESSURA_FRISO_RODA,color=CICLO_RODEIRO))+
+#   geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+
+#   scale_y_continuous(limits = c(18,38))+
+#   geom_smooth()+
+#   geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)+
+#     theme(legend.position="none")
+
+
+
+```
+
+
+
+Listados com bottom 10
+
+```{r}
+
+vagoes <- lista_vagoes_troca_friso_baixo %>% tail(10) %>% as.list()
+
+myplots <- list()
+n <- 1
+for (vagao in vagoes$CODIGO_VAGAO){
+  filtro_vagao <- vagao
+  g1 <- 
+    where(df,df$CODIGO_VAGAO==filtro_vagao)  %>%
+    head(10000) %>%
+    ggplot(aes(x=Dia, y=ESPESSURA_FRISO_RODA,color=CICLO_RODEIRO))+
+    geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+
+    scale_y_continuous(limits = c(18,38))+
+    geom_smooth()+
+    geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)+
+    theme(legend.position="none")
+  
+  myplots[[n]] <- g1
+  n <- n+1
+  print(g1)
+}
+
+
+```
+
+
+
+
+
+
+```{r eval=FALSE, include=FALSE}
 df_list <- randomSplit(sdf, c(7,3), 2)
 df_train <- df_list[[1]]
 df_test <- df_list[[2]]
 
 #model <- spark.glm(df_train, ESPESSURA_FRISO_RODA ~., family = "gaussian")
-
-
-
-
-# collect(df)
-# 
-# DataExplorer::plot_intro(
-#   df, 
-#   ggtheme = theme_bw(),
-#   theme_config = theme(legend.position = "bottom")
-# )
-# 
-# 
-# library(visdat)
-# df %>% 
-# vis_dat( sort_type = TRUE,warn_large_data = FALSE)
-
-
-df %>% select("CODIGO_RODEIRO") %>% head()
-
-#Filtrando apenas os frisos abaixo de 26mm.
-SparkR::subset(df,df$friso_baixo %in% c(1),1:27) %>% head(200)
-
-sql("select  
-    * 
-    from tabela 
-    where friso_baixo ==1 
-    order by CODIGO_RODA") %>% 
-  head(200) %>% View()
-
-
-#Identificando as rodas que tiveram em algum momeno o friso baixo.
-
-sdf_rodas_friso_baixo <- sql("select  
-    CODIGO_RODA
-    from tabela 
-    where friso_baixo ==1 
-    group by CODIGO_RODA")
-
-lista_rodas_friso_baixo <- (collect(sdf_rodas_friso_baixo))
-
-#Não consigo fazer esse filtro.
-sql(paste("select * from tabela where CODIGO_RODA in", lista_rodas_friso_baixo))
-
-
-
 
 # df_list <- randomSplit(sdf, c(7,3), 2)
 # df_train <- df_list[[1]]
@@ -457,4 +448,32 @@ sql(paste("select * from tabela where CODIGO_RODA in", lista_rodas_friso_baixo))
 # sprintf("R2: %.4f", R2)
 
 ```
+
+
+
+
+```{r}
+
+
+#sdf_RODEIRO_friso_baixo_all  %>% 
+#where(df,df$CODIGO_VAGAO=='515276') %>% 
+
+sdf_vagao_trocas_roda_all %>% 
+ collect(.) %>% 
+ ggplot( aes(x=as.character(Dia), y=ESPESSURA_FRISO_RODA, fill=as.character(Dia))) +
+   geom_boxplot() +
+   scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+   geom_jitter(color="black", size=0.05, alpha=0.05) +
+   theme(
+     legend.position="none",
+     plot.title = element_text(size=11)
+   ) +
+   #scale_y_continuous(limits = c(0,100))+
+   ggtitle("ESPESSURA_FRISO_RODA Dia") +
+   xlab("")
+
+
+
+```
+
 
