@@ -59,6 +59,10 @@ library(mlbench)
 library(dplyr)
 library(tidyverse)
 library(SparkR)
+library(gridExtra)
+library(kableExtra)
+library(hrbrthemes)
+library(viridis)
 
 # Iniciar sessão do SPARK
 
@@ -73,19 +77,63 @@ sparkR.conf()
 
 ```
 
-```{r}
+```{r include=FALSE}
 # Importar dataset 
 
 pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
 
+# Utilizando o inferSchema muitos campos numéricos foram identificados com string.
+schema <- structType(
+  structField("ROW_ID", "string"),
+  structField("DATA_HORA_LEITURA", "timestamp"),
+  structField("CODIGO_VAGAO", "string"),
+  structField("CODIGO_RODEIRO", "string"),
+  structField("CODIGO_RODA", "string"),
+  structField("LADO_RODA", "string"),
+  structField("EIXO_VAGAO", "double"),
+  structField("CICLO_RODEIRO", "string"),
+  structField("TRAIN_ID", "string"),
+  structField("SENTIDO_TREM", "string"),
+  structField("VELOCIDADE_ENTRADA_TREM", "double"),
+  structField("VELOCIDADE_SAIDA_TREM", "double"),
+  structField("POSICAO_VAGAO_COMPOSICAO", "double"),
+  structField("ANGULO_FRISO_RODA", "double"),
+  structField("ALTURA_FRISO_RODA", "double"),
+  structField("ESPESSURA_FRISO_RODA", "double"),
+  structField("CAVA_RODA", "double"),
+  structField("ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE", "double"),
+  structField("ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE", "double"),
+  structField("TRACKING_POSITION_EIXO_FRONTAL_TRUQUE", "double"),
+  structField("TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE", "double"),
+  structField("ROTACAO_EIXO", "double"),
+  structField("ALINHAMENTO_ENTRE_EIXOS_(IAM)", "double"),
+  structField("DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)", "double"),
+  structField("TRACKING_ERROR_(TE)", "double"),
+  structField("SERPENTEAMENTO_(HUNTING)", "double"),
+  structField("friso_baixo", "double")
+)
+
 df <- SparkR::read.df(path = pathfile,
                       header='true', 
                       source = "com.databricks.spark.csv", 
-                      inferSchema='true',
+                      schema = schema,
                       na.strings = "")
 
 head(df)
 cache(df)
+
+
+#Criando novas colunas pelo método mais comum.
+df$friso_baixo <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,1,0)
+
+#Criando novas colunas e escolhendo o tipo de dado usanod withColumn.
+df <- df %>% 
+  withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date")) #%>% 
+  #withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date"))
+
+
+df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
+
 #read.df(sqlContext,)
 
 # Incluir o arquivo na memória para facilitar a interação
@@ -123,186 +171,58 @@ col_name <- 0
 is_Null <- 0
 col_class <- 0
 
-# "ROW_ID" "int""
-df_ROW_ID_Null <- where(df, isNull(df$ROW_ID))
+```
 
-# "DATA_HORA_LEITURA" "string"" -> Date
-df_DATA_HORA_LEITURA_Null <- where(df, df$DATA_HORA_LEITURA=="")
+```{r, cache=TRUE}
 
-# "CODIGO_VAGAO" "int"" -> String
-df_CODIGO_VAGAO_Null <- where(df, isNull(df$CODIGO_VAGAO))
+# n <- 1
+# for (coluna in colnames(df)){
+#   cont_prob["nulo",coluna] <- cbind(coluna,
+#   df %>% where(., isNull(.[[coluna]])) %>% count(.)
+#   )
+#   #df %>% where(., isNull(paste0(".$",coluna))) %>% count(.)
+#   n <- n+1
+# }
 
-# "CODIGO_RODEIRO" "int" -> String         
-df_CODIGO_RODEIRO_Null <- where(df, isNull(df$CODIGO_RODEIRO))
 
-# "CODIGO_RODA" "string"  
-df_CODIGO_RODA_Null <- where(df, df$CODIGO_RODEIRO=="")
-
-# "LADO_RODA" "string"       
-df_LADO_RODA_Null <- where(df, df$LADO_RODA=="")
-
-# "EIXO_VAGAO" "int"       
-df_EIXO_VAGAO_Null <- where(df, isNull(df$EIXO_VAGAO))
-
-# "CICLO_RODEIRO" "string"       
-df_CICLO_RODEIRO_Null <- where(df, df$CICLO_RODEIRO=="")
-
-# "TRAIN_ID" "string"  
-df_TRAIN_ID_Null <- where(df, df$TRAIN_ID=="")
-
-# "SENTIDO_TREM" "string"      
-df_SENTIDO_TREM_Null <- where(df, df$SENTIDO_TREM=="")
-
-# "VELOCIDADE_ENTRADA_TREM" "int"                    
-df_VELOCIDADE_ENTRADA_TREM_Null <- where(df, isNull(df$VELOCIDADE_ENTRADA_TREM))
-
-# "VELOCIDADE_SAIDA_TREM" "int"                  
-df_VELOCIDADE_SAIDA_TREM_Null <- where(df, isNull(df$VELOCIDADE_SAIDA_TREM))
-
-# "POSICAO_VAGAO_COMPOSICAO" "int"                     
-df_POSICAO_VAGAO_COMPOSICAO_Null <- where(df, isNull(df$POSICAO_VAGAO_COMPOSICAO))
-
-# "ANGULO_FRISO_RODA" "string" -> int           
-df_ANGULO_FRISO_RODA_Null <- where(df, df$ANGULO_FRISO_RODA=="")
-
-# "ALTURA_FRISO_RODA" "string" -> int           
-df_ALTURA_FRISO_RODA_Null <- where(df, df$ALTURA_FRISO_RODA=="")
-
-# "ESPESSURA_FRISO_RODA" "string" - int       
-df_ESPESSURA_FRISO_RODA_Null <- where(df, df$ESPESSURA_FRISO_RODA=="")
-
-# "CAVA_RODA" "string" - int   
-df_CAVA_RODA_Null <- where(df, df$CAVA_RODA=="")
-
-# "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE" "string" - int
-df_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_Null <- where(df, df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE=="")
-
-# "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE" "string" - int
-df_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_Null <- where(df, df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE=="")
-
-# "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE" "string" - int
-df_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_Null <- where(df, df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE=="")
-
-# "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE" "string" - int
-df_TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE_Null <- where(df, df$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE=="")
-
-# "ROTACAO_EIXO" "string" - int
-df_ROTACAO_EIXO_Null <- where(df, df$ROTACAO_EIXO=="")
-
-# "ALINHAMENTO_ENTRE_EIXOS_IAM" "string" - int                       
-df_ALINHAMENTO_ENTRE_EIXOS_IAM_Null <- where(df, df$`ALINHAMENTO_ENTRE_EIXOS_(IAM)`=="")
-
-# "DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)" "string" - int                          
-df_DESLOCAMENTO_ENTRE_EIXOS_SHIFT_Null <- where(df, df$`DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)`=="")
-
-# "TRACKING_ERROR_(TE)" "string" - int
-df_TRACKING_ERROR_TE_Null <- where(df, df$`TRACKING_ERROR_(TE)`=="")
-
-# "SERPENTEAMENTO_(HUNTING)" "int"                   
-df_SERPENTEAMENTO_HUNTING_Null <- where(df, df$`SERPENTEAMENTO_(HUNTING)`=="")
-
-col_names <- columns(df)
-
-is_null <- c(count(df_ROW_ID_Null),
-             count(df_DATA_HORA_LEITURA_Null),
-             count(df_CODIGO_VAGAO_Null),
-             count(df_CODIGO_RODEIRO_Null),
-             count(df_CODIGO_RODA_Null),
-             count(df_LADO_RODA_Null),
-             count(df_EIXO_VAGAO_Null),
-             count(df_CICLO_RODEIRO_Null),
-             count(df_TRAIN_ID_Null),
-             count(df_SENTIDO_TREM_Null),
-             count(df_VELOCIDADE_ENTRADA_TREM_Null),
-             count(df_VELOCIDADE_SAIDA_TREM_Null),
-             count(df_POSICAO_VAGAO_COMPOSICAO_Null),
-             count(df_ANGULO_FRISO_RODA_Null),
-             count(df_ALTURA_FRISO_RODA_Null),
-             count(df_ESPESSURA_FRISO_RODA_Null),
-             count(df_CAVA_RODA_Null),
-             count(df_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_Null),
-             count(df_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_Null),
-             count(df_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_Null),
-             count(df_TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE_Null),
-             count(df_ROTACAO_EIXO_Null),
-             count(df_ALINHAMENTO_ENTRE_EIXOS_IAM_Null),
-             count(df_DESLOCAMENTO_ENTRE_EIXOS_SHIFT_Null),
-             count(df_TRACKING_ERROR_TE_Null),
-             count(df_SERPENTEAMENTO_HUNTING_Null))
-
-data_type_after <- 0
-for (i in 1:ncol_df){
-  data_type_after[i] <- dtypes(df)[[i]][2]
-  print(dtypes(df)[[i]][2])
+test_null <- function(coluna){
+   df %>% where(.,isNull(.[[coluna]]))%>%count(.)
 }
 
-analise_das_variaveis <- data.frame(col_names, is_null, data_type_after)
-colnames(analise_das_variaveis) <- c("Variável",
-"Qtd de dados Nulos", "Tipo de dado antes")
-analise_das_variaveis
-```
 
-##### Ajustar os dados estão com o tipo incorreto
-
-```{r include=FALSE}
-# Variáveis que necessitam de transformação
-
-str(df)
-
-# "CODIGO_VAGAO" "int"" -> String
-df$CODIGO_VAGAO <- cast(df$CODIGO_VAGAO, dataType = "string")
-
-# "CODIGO_RODEIRO" "int" -> String   
-df$CODIGO_RODEIRO <- cast(df$CODIGO_RODEIRO, dataType = "string")
-
-# "ANGULO_FRISO_RODA" "string" -> Int
-df$ANGULO_FRISO_RODA <- cast(df$ANGULO_FRISO_RODA, dataType = "integer")
-
-# "ALTURA_FRISO_RODA" "string" -> int  
-df$ALTURA_FRISO_RODA <- cast(df$ALTURA_FRISO_RODA, dataType = "integer")
-
-# "ESPESSURA_FRISO_RODA" "string" - int
-df$ESPESSURA_FRISO_RODA <- cast(df$ESPESSURA_FRISO_RODA, dataType = "integer")
-
-# "CAVA_RODA" "string" - int  
-df$CAVA_RODA <- cast(df$CAVA_RODA, dataType = "integer")
-
-# "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE" "string" - "int"  
-df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE <- cast(df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, dataType = "integer")
-
-# "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE" "string" - int
-df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE <- cast(df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, dataType = "integer")
-
-# "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE" "string" - int
-df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE <- cast(df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, dataType = "integer")
-
-# "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE" "string" - int
-df$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE <- cast(df$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE, dataType = "integer")
-
-# "ROTACAO_EIXO" "string" - int
-df$ROTACAO_EIXO <- cast(df$ROTACAO_EIXO, dataType = "integer")
-
-# "DATA_HORA_LEITURA" "string"" -> Date
-data_hora_leitura_uts <- unix_timestamp(df$DATA_HORA_LEITURA, 'MM/dd/yyyy')
-data_hora_leitura_ts <- cast(data_hora_leitura_uts, 'timestamp')
-data_hora_leitura_dt <- cast(data_hora_leitura_ts, 'date')
-df <- withColumn(df,'DATA_HORA_LEITURA_dt',data_hora_leitura_dt)
-
-data_type_before <- 0
-for (i in 1:ncol_df){
-  data_type_before[i] <- dtypes(df)[[i]][2]
-  print(dtypes(df)[[i]][2])
+test_isNAN <- function(coluna){
+  df %>% where(.,isNaN(.[[coluna]]))%>%count(.)
 }
 
-analise_das_variaveis <- data.frame(col_names, is_null, data_type_after, data_type_before)
-colnames(analise_das_variaveis) <- c("Variável",
-"Qtd de dados Nulos", "Tipo de dado antes","Tipo de dado depois")
-analise_das_variaveis
+
+test_vazio <- function(coluna){
+  df %>% where(.,.[[coluna]]== "")  %>% count(.)
+}
+ 
+
+test_zero <- function(coluna){
+  df %>% where(.,.[[coluna]]== 0)  %>% count(.)
+}
+
+
+cont_prob <- data.frame()
+for (coluna in colnames(df)){
+  
+  cont_prob["nulo",coluna]  <- test_null(coluna)
+  #cont_prob["isNAN",coluna] <- test_isNAN(coluna)
+  #cont_prob["vazio",coluna] <- test_vazio(coluna)
+  #cont_prob["zero",coluna]  <- test_zero(coluna)
+  
+  print(coluna)
+  
+}
+
+
+cont_prob %>% t() %>% kable(., format = "html",row.names = T, digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
+
 ```
 
-```{r table}
-knitr::kable(analise_das_variaveis, caption = "Análise e conversão das variáveis do problema")
-```
 
 #### Identificar as principais estatisticas da Amostra
 
@@ -329,6 +249,30 @@ showDF(sumstats5)
 showDF(sumstats6)
 ```
 
+
+```{r echo=FALSE}
+#Usando a função agg
+
+agg(df, velo_entrada_avg = avg(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
+agg(df, velo_entrada_sd = sd(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
+agg(df, velo_entrada_var = var(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
+agg(df, velo_entrada_max = max(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
+
+agg(df, alt_friso_avg = avg(df$ESPESSURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_sd = sd(df$ESPESSURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_var = var(df$ESPESSURA_FRISO_RODA)) %>% head()
+agg(df, alt_friso_max = max(df$ESPESSURA_FRISO_RODA)) %>% head()
+
+
+#Usando agg com agregação
+gb_sn <- groupBy(df, df$CODIGO_RODA)
+df2 <- agg(gb_sn, friso_avg = avg(df$ESPESSURA_FRISO_RODA), count = n(df$ESPESSURA_FRISO_RODA))
+head(df2)
+
+
+```
+
+
 #### Identificar as principais correlações entre os dados
 
 ```{r}
@@ -340,6 +284,200 @@ corr_EFR_EV
 ```
 
 #### Construir visualizações
+
+Listados com top 10
+
+```{r}
+
+createOrReplaceTempView(df, "tabela")
+
+sdf_vagao_trocas_roda <- sql("select
+    CODIGO_VAGAO
+    ,count(*) qtd
+
+    from tabela
+    where CODIGO_RODA != CICLO_RODEIRO
+          and
+          CODIGO_VAGAO in 
+              (select
+                  CODIGO_VAGAO
+                      from tabela
+                    where friso_baixo ==1
+                    group by CODIGO_VAGAO)
+
+
+    group by CODIGO_VAGAO
+    order by qtd desc
+
+    "
+    
+    )
+
+
+
+sdf_vagao_trocas_roda_all <- sql(
+"
+  select
+    *
+  from
+  tabela
+  
+  where CODIGO_VAGAO in
+  (
+  select
+    CODIGO_VAGAO
+    
+      from tabela
+    where CODIGO_RODA != CICLO_RODEIRO
+          and
+          CODIGO_VAGAO in 
+              (select
+                  CODIGO_VAGAO
+                      from tabela
+                    where friso_baixo ==1
+                    group by CODIGO_VAGAO)
+
+
+    group by CODIGO_VAGAO
+  )
+  
+  "
+)
+
+
+
+
+
+
+lista_vagoes_troca_friso_baixo <- sdf_vagao_trocas_roda %>% head(1000)
+
+
+vagoes <- lista_vagoes_troca_friso_baixo %>% head(10) %>% as.list()
+
+myplots <- list()
+n <- 1
+for (vagao in vagoes$CODIGO_VAGAO){
+  filtro_vagao <- vagao
+  g1 <- 
+    where(df,df$CODIGO_VAGAO==filtro_vagao)  %>%
+    head(10000) %>%
+    ggplot(aes(x=Dia, y=ESPESSURA_FRISO_RODA,color=CICLO_RODEIRO))+
+    geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+
+    scale_y_continuous(limits = c(18,38))+
+    geom_smooth()+
+    geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)+
+    theme(legend.position="none")
+  
+  myplots[[n]] <- g1
+  n <- n+1
+  print(g1)
+}
+
+
+
+# where(df,df$CODIGO_VAGAO=='69632')%>%
+#   collect(.)%>%
+#   ggplot(aes(x=Dia, y=ESPESSURA_FRISO_RODA,color=CICLO_RODEIRO))+
+#   geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+
+#   scale_y_continuous(limits = c(18,38))+
+#   geom_smooth()+
+#   geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)+
+#     theme(legend.position="none")
+
+
+
+```
+
+Listados com bottom 10
+
+```{r}
+
+vagoes <- lista_vagoes_troca_friso_baixo %>% tail(10) %>% as.list()
+
+myplots <- list()
+n <- 1
+for (vagao in vagoes$CODIGO_VAGAO){
+  filtro_vagao <- vagao
+  g1 <- 
+    where(df,df$CODIGO_VAGAO==filtro_vagao)  %>%
+    head(10000) %>%
+    ggplot(aes(x=Dia, y=ESPESSURA_FRISO_RODA,color=CICLO_RODEIRO))+
+    geom_point()+facet_wrap(~CODIGO_RODA,ncol = 2)+
+    scale_y_continuous(limits = c(18,38))+
+    geom_smooth()+
+    geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)+
+    theme(legend.position="none")
+  
+  myplots[[n]] <- g1
+  n <- n+1
+  print(g1)
+}
+
+
+```
+
+
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+df_list <- randomSplit(sdf, c(7,3), 2)
+df_train <- df_list[[1]]
+df_test <- df_list[[2]]
+
+#model <- spark.glm(df_train, ESPESSURA_FRISO_RODA ~., family = "gaussian")
+
+# df_list <- randomSplit(sdf, c(7,3), 2)
+# df_train <- df_list[[1]]
+# df_test <- df_list[[2]]
+# 
+# model <- spark.glm(df_train, GENDER ~., family = "gaussian")
+# 
+# summary(model)
+# 
+# predictions_1 <- predict(model, df_train)
+# local_df <- collect(predictions_1)
+# p = local_df$label-local_df$prediction
+# mse = mean((p)^2)
+# mae = mean(abs(p))
+# rmse = sqrt(mse)
+# R2 = 1-(sum((p)^2)/sum((local_df$label-mean(local_df$label))^2))
+# print("Métricas de avaliação da base de Treino")
+# sprintf(" MAE: %.2f", mae)
+# sprintf("MSE: %.2f", mse)
+# sprintf("RMSE: %.2f", rmse)
+# sprintf("R2: %.4f", R2)
+
+```
+
+
+
+
+```{r}
+
+
+#sdf_RODEIRO_friso_baixo_all  %>% 
+#where(df,df$CODIGO_VAGAO=='515276') %>% 
+
+sdf_vagao_trocas_roda_all %>% 
+ collect(.) %>% 
+ ggplot( aes(x=as.character(Dia), y=ESPESSURA_FRISO_RODA, fill=as.character(Dia))) +
+   geom_boxplot() +
+   scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+   geom_jitter(color="black", size=0.05, alpha=0.05) +
+   theme(
+     legend.position="none",
+     plot.title = element_text(size=11)
+   ) +
+   #scale_y_continuous(limits = c(0,100))+
+   ggtitle("ESPESSURA_FRISO_RODA Dia") +
+   xlab("")
+
+
+
+```
+
 
 ```{r}
 
