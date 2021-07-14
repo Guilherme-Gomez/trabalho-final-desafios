@@ -195,48 +195,30 @@ col_class <- 0
 
 ```
 
+
 ```{r, cache=TRUE}
 
-# n <- 1
-# for (coluna in colnames(df)){
-#   cont_prob["nulo",coluna] <- cbind(coluna,
-#   df %>% where(., isNull(.[[coluna]])) %>% count(.)
-#   )
-#   #df %>% where(., isNull(paste0(".$",coluna))) %>% count(.)
-#   n <- n+1
-# }
-
+#Verificando qualidade dos dados.
 
 test_null <- function(coluna){
-   try(df %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)
-}
-
+   try(df %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)}
 
 test_isNAN <- function(coluna){
-  try(df %>% where(.,isNaN(.[[coluna]]))%>%count(.), silent = TRUE)
-}
-
+  try(df %>% where(.,isNaN(.[[coluna]]))%>%count(.), silent = TRUE)}
 
 test_vazio <- function(coluna){
-  try(df %>% where(.,.[[coluna]]== "")  %>% count(.), silent = TRUE)
-}
- 
+  try(df %>% where(.,.[[coluna]]== "")  %>% count(.), silent = TRUE)}
 
 test_zero <- function(coluna){
-  try(df %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)
-}
+  try(df %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
 
 
 cont_prob <- data.frame()
 for (coluna in colnames(df)){
-  
   cont_prob["nulo",coluna]  <- test_null(coluna)
   cont_prob["isNAN",coluna] <- test_isNAN(coluna)
   cont_prob["vazio",coluna] <- test_vazio(coluna)
   cont_prob["zero",coluna]  <- test_zero(coluna)
-  
-  print(coluna)
-  
 }
 cont_prob <- t(cont_prob) %>% as.data.frame()
 
@@ -248,7 +230,6 @@ cont_prob[which(grepl(",",cont_prob[,4])),4] <- 0
 
 cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
-
 ```
 
 
