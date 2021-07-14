@@ -23,8 +23,8 @@ Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez**
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 10, warning = F, error = F)
 ```
-linha de teste
-linhatest2
+
+
 ### Metodologia utilizada
 
 Utilizaremos para a realização deste trabalho a metodologia CRISP-DM
@@ -68,10 +68,12 @@ library(viridis)
 # Iniciar sessão do SPARK
 
 spark_path <-"C:/spark-3.1.2-bin-hadoop3.2"
+#spark_path <-'C:/Guilherme/spark'
 if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
   Sys.setenv(SPARK_HOME = spark_path)
 }
 sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "6g"))
+#list(spark.driver.memory = "1g"))
 
 sqlContext <- sparkR.session(sc)
 sparkR.conf()
@@ -82,6 +84,8 @@ sparkR.conf()
 # Importar dataset 
 
 pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
+#pathfile = "C:/Guilherme/FGV/Desafios e Requisitos dos Projetos Analiticos/EFC_WAYSIDES.csv"
+
 
 # Utilizando o inferSchema muitos campos numéricos foram identificados com string.
 schema <- structType(
