@@ -23,7 +23,7 @@ Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez**
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 10, warning = F, error = F)
 ```
-
+linha de teste
 ### Metodologia utilizada
 
 Utilizaremos para a realização deste trabalho a metodologia CRISP-DM
