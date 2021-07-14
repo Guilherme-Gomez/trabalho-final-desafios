@@ -238,9 +238,15 @@ for (coluna in colnames(df)){
   print(coluna)
   
 }
+cont_prob <- t(cont_prob) %>% as.data.frame()
 
+#Removendo os valores com erros (Texto).
+cont_prob[which(grepl(",",cont_prob[,1])),1] <- 0
+cont_prob[which(grepl(",",cont_prob[,2])),2] <- 0
+cont_prob[which(grepl(",",cont_prob[,3])),3] <- 0
+cont_prob[which(grepl(",",cont_prob[,4])),4] <- 0
 
-cont_prob %>% t() %>% kable(., format = "html",row.names = T, digits = 2) %>%
+cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 
 ```
