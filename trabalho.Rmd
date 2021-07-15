@@ -52,6 +52,7 @@ A Vale pretende prever o desgaste de rodas de vagões e fornecer uma visão futu
 
 ### Entendimento dos Dados
 
+
 ```{r include=FALSE}
 # Importar bibliotecas que serão utilizadas no trabalho
 
@@ -65,10 +66,11 @@ library(hrbrthemes)
 library(viridis)
 
 # Iniciar sessão do SPARK
-# Separando as mehores configurações para os computadores que cada integrante do grupo usa.
+# Separando as melhores configurações para os computadores que cada integrante do grupo usa.
 
 aluno <- "Guilherme"
 #aluno <- "Davi"
+#aluno <- readline(prompt="Enter name: ")
 
 if (aluno == "Guilherme") {
 
@@ -101,6 +103,7 @@ sqlContext <- sparkR.session(sc)
 sparkR.conf()
 
 ```
+
 
 ```{r include=FALSE}
 # Importar dataset 
@@ -149,12 +152,12 @@ cache(df)
 #Criando novas colunas pelo método mais comum.
 df$friso_baixo <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,1,0)
 
-#Criando novas colunas e escolhendo o tipo de dado usanod withColumn.
+#Criando novas colunas e escolhendo o tipo de dado usando withColumn.
 df <- df %>% 
   withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date")) #%>% 
   #withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date"))
 
-
+#Criando uma amostra dos dados para fazer simulações com um dateset mais leve.
 df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
 
 #read.df(sqlContext,)
@@ -177,7 +180,7 @@ printSchema(df)
 
 ##### Verificar a existencia de dados faltantes
 
-Foi verificado que nenhuma variável possui valores faltantes (Null, NaN, etc). Algumas variáveis possuem tipo incorreto ao apresentado na proposição do problema.
+Há valores nulos nos campos dos resultados das medições. É notável que há erros em algumas linhaspara todas medições do T-BOGIE.  
 
 ```{r include=FALSE}
 
@@ -201,6 +204,8 @@ col_class <- 0
 
 #Verificando qualidade dos dados.
 
+#Funções que serão utilizadas dentro do loop para varrer o dataset e contabilizar os problemas.
+#Foi necessário utilizar o try, pois alguma funções retornam erro para variáveis do tipo date ou datetime.
 test_null <- function(coluna){
    try(df %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)}
 
@@ -213,10 +218,11 @@ test_vazio <- function(coluna){
 test_zero <- function(coluna){
   try(df %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
 
-
+#Dataframe para contabilizar os erros dentro do loop.
 cont_prob <- data.frame()
 for (coluna in colnames(df)){
-#As colunas no dataframe serão linhas neste relatório.
+#As colunas no dataframe são linhas neste relatório
+#Foi necessário criar uma condição para evitar a inclusão de textos (erros) no resultado.
   
   cont_prob[coluna,"nulo"]  <- ifelse(is.numeric(test_null(coluna)),test_null(coluna),0)
   cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(coluna)),test_isNAN(coluna),0)
@@ -225,6 +231,7 @@ for (coluna in colnames(df)){
   
 }
 
+#Print da tabela com a contabilização dos problemas.
 cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
@@ -257,23 +264,47 @@ showDF(sumstats6)
 
 
 ```{r echo=FALSE}
-#Usando a função agg
 
-agg(df, velo_entrada_avg = avg(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-agg(df, velo_entrada_sd = sd(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-agg(df, velo_entrada_var = var(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-agg(df, velo_entrada_max = max(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
+#Listando apenas as colunas que são numéricas.
+colunas_numeric <- cbind(coltypes(df),colnames(df)) %>% 
+  as.data.frame %>% 
+  dplyr::filter(.$V1=="numeric") %>% 
+  dplyr::select(medidas=V2)
 
-agg(df, alt_friso_avg = avg(df$ESPESSURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_sd = sd(df$ESPESSURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_var = var(df$ESPESSURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_max = max(df$ESPESSURA_FRISO_RODA)) %>% head()
+
+
+resumo_medidas <- data.frame()
+resultado <- data.frame()
+
+for (coluna in colunas_numeric$medidas){
+#As colunas no dataframe são linhas neste relatório
+#utilizando os dados de amostras (samples) para ser mais ágil.
+  
+  resultado <- cbind(coluna,
+    
+              df_sample %>% agg(., 
+              media = avg(.[[coluna]]),
+              desvio_padrao = sd(.[[coluna]]),
+              variancia = var(.[[coluna]]),
+              maximo = max(.[[coluna]]),
+              minimo = min(.[[coluna]])) %>% 
+              as.data.frame())
+  
+  resumo_medidas <- rbind(resumo_medidas,resultado)
+  
+  }
+
+
+#Print da tabela resumo.
+resumo_medidas %>% kable(., format = "html",row.names = T, digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
+
 
 
 #Usando agg com agregação
-gb_sn <- groupBy(df, df$CODIGO_RODA)
-df2 <- agg(gb_sn, friso_avg = avg(df$ESPESSURA_FRISO_RODA), count = n(df$ESPESSURA_FRISO_RODA))
-head(df2)
+# gb_sn <- groupBy(df_sample, df_sample$CODIGO_RODA)
+# df2 <- agg(gb_sn, friso_avg = avg(df_sample$ESPESSURA_FRISO_RODA), count = n(df_sample$ESPESSURA_FRISO_RODA))
+# head(df2)
 
 
 ```
@@ -498,12 +529,12 @@ df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
 grupo_angulo_null <- groupBy(df %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]])), df$CODIGO_RODA)
 df2 <- agg(grupo_angulo_null,count = n(df$CODIGO_RODA))
 df2 %>% head(1000) %>% View()
-#Algumas rodas nunca tiveram medidas de ângulo
+#Algumas rodas nunca tiveram medidas de ângulo (20 medidas com NA)
 #(5054164RIGHT,0960614RIGHT,6083714RIGHT,0995294RIGHT,5534531LEFT,5519574RIGHT,0867584RIGHT,6346311RIGHT,0809114RIGHT,5599823RIGHT)
 # O que fazer nestes casos?
 
 
-#Exemplo de rodas com falta de dados e uma opção de completar com fill.
+#Exemplo de rodas com falta de dados e opções de completar com fill (dados de outras medições)
 
 cbind(
 df %>% 
@@ -594,3 +625,5 @@ df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== 0)  %>% head(10
 
 ### Conclusão
 
+
+resumo_medidas <- data.frame()
