@@ -65,17 +65,18 @@ library(hrbrthemes)
 library(viridis)
 
 # Iniciar sessão do SPARK
+# Separando as mehores configurações para os computadores que cada integrante do grupo usa.
 
 aluno <- "Guilherme"
 #aluno <- "Davi"
 
 if (aluno == "Guilherme") {
-library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
-  
+
 spark_path <-'C:/Guilherme/spark'
 if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
   Sys.setenv(SPARK_HOME = spark_path)
 }
+library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
 sparkR.session(master = "local[*]", sparkConfig = 
 list(spark.driver.memory = "1g"))
 
@@ -215,18 +216,14 @@ test_zero <- function(coluna){
 
 cont_prob <- data.frame()
 for (coluna in colnames(df)){
-  cont_prob["nulo",coluna]  <- test_null(coluna)
-  cont_prob["isNAN",coluna] <- test_isNAN(coluna)
-  cont_prob["vazio",coluna] <- test_vazio(coluna)
-  cont_prob["zero",coluna]  <- test_zero(coluna)
+#As colunas no dataframe serão linhas neste relatório.
+  
+  cont_prob[coluna,"nulo"]  <- ifelse(is.numeric(test_null(coluna)),test_null(coluna),0)
+  cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(coluna)),test_isNAN(coluna),0)
+  cont_prob[coluna,"vazio"] <- ifelse(is.numeric(test_vazio(coluna)),test_vazio(coluna),0)
+  cont_prob[coluna,"zero"]  <- ifelse(is.numeric(test_zero(coluna)),test_zero(coluna),0)
+  
 }
-cont_prob <- t(cont_prob) %>% as.data.frame()
-
-#Removendo os valores com erros (Texto).
-cont_prob[which(grepl(",",cont_prob[,1])),1] <- 0
-cont_prob[which(grepl(",",cont_prob[,2])),2] <- 0
-cont_prob[which(grepl(",",cont_prob[,3])),3] <- 0
-cont_prob[which(grepl(",",cont_prob[,4])),4] <- 0
 
 cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
@@ -488,14 +485,99 @@ sdf_vagao_trocas_roda_all %>%
 ```
 
 
+### Preparação dos Dados
+
+
+
+
 ```{r}
 
+df_sample %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
+df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
+
+grupo_angulo_null <- groupBy(df %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]])), df$CODIGO_RODA)
+df2 <- agg(grupo_angulo_null,count = n(df$CODIGO_RODA))
+df2 %>% head(1000) %>% View()
+#Algumas rodas nunca tiveram medidas de ângulo
+#(5054164RIGHT,0960614RIGHT,6083714RIGHT,0995294RIGHT,5534531LEFT,5519574RIGHT,0867584RIGHT,6346311RIGHT,0809114RIGHT,5599823RIGHT)
+# O que fazer nestes casos?
+
+
+#Exemplo de rodas com falta de dados e uma opção de completar com fill.
+
+cbind(
+df %>% 
+  where(.,df$CODIGO_RODA %in%
+c('0956094RIGHT','6241133RIGHT','0851232RIGHT','7011773RIGHT','0825071RIGHT','5519574RIGHT','5392051LEFT','6395011LEFT','9126664LEFT')) %>% 
+  select('Dia','CODIGO_RODA','ANGULO_FRISO_RODA') %>%  
+  arrange('CODIGO_RODA','Dia') %>% 
+  head(10000)
+,
+
+df %>% 
+  where(.,df$CODIGO_RODA %in%
+c('0956094RIGHT','6241133RIGHT','0851232RIGHT','7011773RIGHT','0825071RIGHT','5519574RIGHT','5392051LEFT','6395011LEFT','9126664LEFT')) %>% 
+  arrange('CODIGO_RODA','Dia') %>% 
+    select('ANGULO_FRISO_RODA') %>%  
+  withColumnRenamed('ANGULO_FRISO_RODA','downup') %>% 
+  head(10000) %>% 
+  fill('downup', .direction = "downup")
+
+,
+
+df %>% 
+  where(.,df$CODIGO_RODA %in%
+c('0956094RIGHT','6241133RIGHT','0851232RIGHT','7011773RIGHT','0825071RIGHT','5519574RIGHT','5392051LEFT','6395011LEFT','9126664LEFT')) %>% 
+  arrange('CODIGO_RODA','Dia') %>% 
+    select('ANGULO_FRISO_RODA') %>%   
+  withColumnRenamed('ANGULO_FRISO_RODA','up') %>% 
+  head(10000) %>% 
+  fill('up', .direction = "up")
+
+
+
+,
+
+df %>% 
+  where(.,df$CODIGO_RODA %in%
+c('0956094RIGHT','6241133RIGHT','0851232RIGHT','7011773RIGHT','0825071RIGHT','5519574RIGHT','5392051LEFT','6395011LEFT','9126664LEFT')) %>% 
+  arrange('CODIGO_RODA','Dia') %>% 
+    select('ANGULO_FRISO_RODA') %>%  
+  withColumnRenamed('ANGULO_FRISO_RODA','down') %>% 
+  head(10000) %>% 
+  fill('down', .direction = "down")
+
+
+) %>% 
+   View()
+
+
+
+df_sample %>% where(.,isNull(.[["ALTURA_FRISO_RODA"]]))%>% head(100) %>% View()
+df_sample %>% where(.,isNull(.[["ESPESSURA_FRISO_RODA"]]))%>% head(100) %>% View()
+df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100) %>% View()
+
+
+
+# As medidas do TBOGIE parecem falhar pelo mesma razão para todas as medidas.
+
+# ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE       
+# ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE      
+# TRACKING_POSITION_EIXO_FRONTAL_TRUQUE   
+# ROTACAO_EIXO                            
+# ALINHAMENTO_ENTRE_EIXOS_(IAM)           
+# DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)        
+# TRACKING_ERROR_(TE)                     
+# SERPENTEAMENTO_(HUNTING)  
+
+df_sample %>% where(.,isNaN(.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]])) %>% head(100) %>% View()
+df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== "")  %>% head(100) %>% View()
+df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== 0)  %>% head(100) %>% View()
 
 
 ```
 
 
-### Preparação dos Dados
 
 #### Normalizaçao?
 #### PCA/Redução de dimensionalidade
