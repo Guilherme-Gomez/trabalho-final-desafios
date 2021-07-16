@@ -63,6 +63,8 @@ library(gridExtra)
 library(kableExtra)
 library(hrbrthemes)
 library(viridis)
+library(tseries)
+library(ggfortify)
 
 # Iniciar sessão do SPARK
 # Separando as mehores configurações para os computadores que cada integrante do grupo usa.
@@ -254,10 +256,27 @@ cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
 
-#### 
+##### Avaliando os dados nulos
+
+###### CAVA_RODA, ANGULO_FRiSO_RODA 
+
+CAVA_RODA: A variável com maior número de dados nulos foi a CAVA_RODA com 607.049 (20%) dados nulos. Com o objetivo de avaliar a estratégia de tratamento dos dados vamos realizar a distribuição de dados nulos em comparação com as outras variáveis.
+
+ANGULO_FRISO_RODA: A segunda variável com maior número de dados nulos foi a ANGULO_FRISO_RODA com 287.408 (10%) dados nulos em comparação as outras variáveis.
 
 ```{r}
-# Avaliando os dados nulos para ANGULO_FRISO_RODA
+
+# Avaliando os dados nulos para CAVA_RODA, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+df_null_CAVA_RODA <- where(df, isNull(df$CAVA_RODA))
+
+nulos_CAVA_RODA <- count(df_null_CAVA_RODA)
+
+perc_nulos_CAVA_RODA <- paste(round((nulos_CAVA_RODA/total)*100,0),"%",sep="")
+
+perc_nulos_CAVA_RODA
+
+# Avaliando os dados nulos para ANGULO_FRiSO_RODA, indentificando se ocorreu alguma data com maior numero de dados nulos.
 
 df_null_ANGULO_FRISO_RODA <- where(df, isNull(df$ANGULO_FRISO_RODA))
 
@@ -266,14 +285,138 @@ nulos_ANGULO_FRISO_RODA <- count(df_null_ANGULO_FRISO_RODA)
 perc_nulos_ANGULO_FRISO_RODA <- paste(round((nulos_ANGULO_FRISO_RODA/total)*100,0),"%",sep="")
 
 perc_nulos_ANGULO_FRISO_RODA
+
+# O percentual de dados faltando para CAVA_RODA é de 20%
+
+gb_df_null_CAVA_RODA <- groupBy(df_null_CAVA_RODA, df_null_CAVA_RODA$Dia)
+
+nNull_CAVA_RODA_by_DIA <- agg(gb_df_null_CAVA_RODA, Nulls_CAVA_RODA = n(df_null_CAVA_RODA$Dia))
+
+nNull_CAVA_RODA_by_DIA.dat <- collect(nNull_CAVA_RODA_by_DIA)
+nNull_CAVA_RODA_by_DIA.dat
+
+CAVA_RODA_order_by_date <- nNull_CAVA_RODA_by_DIA.dat[order(nNull_CAVA_RODA_by_DIA.dat$Dia),]
+CAVA_RODA_order_by_date
+
 # O percentual de dados faltando para ANGULO_FRISO_RODA é de 10%
 
-gb_df_null_ANGULO_FRISO_RODA <- groupBy(df_null_ANGULO_FRISO_RODA, df_null_ANGULO_FRISO_RODA$CODIGO_VAGAO)
+gb_df_null_ANGULO_FRISO_RODA <- groupBy(df_null_ANGULO_FRISO_RODA, df_null_ANGULO_FRISO_RODA$Dia)
 
-nNull_ANGULO_FRISO_RODA_by_CVAGAO <- agg(gb_df_null_ANGULO_FRISO_RODA, Nulls = n(df_null_ANGULO_FRISO_RODA$CODIGO_VAGAO))
+nNull_ANGULO_FRISO_RODA_by_DIA <- agg(gb_df_null_ANGULO_FRISO_RODA, 
+                                      Nulls_ANGULO_FRISO_RODA = n(df_null_ANGULO_FRISO_RODA$Dia))
 
-nNull_ANGULO_FRISO_RODA_by_CVAGAO.dat <- collect(nNull_ANGULO_FRISO_RODA_by_CVAGAO)
-nNull_ANGULO_FRISO_RODA_by_CVAGAO.dat
+nNull_ANGULO_FRISO_RODA_by_DIA.dat <- collect(nNull_ANGULO_FRISO_RODA_by_DIA)
+nNull_ANGULO_FRISO_RODA_by_DIA.dat
+
+ANGULO_FRISO_RODA_order_by_date <- nNull_ANGULO_FRISO_RODA_by_DIA.dat[order(nNull_ANGULO_FRISO_RODA_by_DIA.dat$Dia),]
+ANGULO_FRISO_RODA_order_by_date
+
+full <- full_join(CAVA_RODA_order_by_date,
+                  ANGULO_FRISO_RODA_order_by_date,
+                  by = NULL)
+full
+
+# Gráfico de Nulos CAVA_RODA por data
+
+g_CAVA_RODA_order_by_date <- ggplot(CAVA_RODA_order_by_date, aes(x=Dia, y=Nulls))+
+  geom_line(color="green")+
+  ggtitle("Nulos em CAVA_RODA por dia")+
+  xlab("Data (dias)")+
+  ylab("Total de Nulos")+
+  theme_dark()
+g_CAVA_RODA_order_by_date
+
+# Gráfico de Nulos ANGULO_FRISO_RODA por data
+
+g_ANGULO_FRISO_RODA_order_by_date <- ggplot(ANGULO_FRISO_RODA_order_by_date, aes(x=Dia, y=Nulls))+
+  geom_line(color="red")+
+  ggtitle("Nulos em ANGULO_FRISO_RODA por dia")+
+  xlab("Data (dias)")+
+  ylab("Total de Nulos")+
+  theme_dark()
+g_ANGULO_FRISO_RODA_order_by_date
+
+# Gráfico de Full
+
+g_full <- ggplot(full, aes(x=Dia))+
+  geom_line(aes(y=Nulls_CAVA_RODA),color="green")+
+  geom_line(aes(y=Nulls_ANGULO_FRISO_RODA),color="red")+
+  ggtitle("Nulos nas variáveis por dia")+
+  xlab("Data (dias)")+
+  ylab("Total de Nulos")+
+  theme_dark()
+g_full
+
+
+```
+
+###### ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE, ROTACAO_EIXO, ALINHAMENTO_ENTRE_EIXOS_(IAM), DESLOCAMENTO_ENTRE_EIXOS_(SHIFT) e TRACKING_ERROR_(TE)
+
+Essas variáveis apresentam 19.723 (1%) de valores nulos
+
+```{r}
+
+# Avaliando os dados nulos para CAVA_RODA, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+variaveis <- c("ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE",
+"ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE"
+,"TRACKING_POSITION_EIXO_FRONTAL_TRUQUE",
+"TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE",
+"ROTACAO_EIXO", 
+"ALINHAMENTO_ENTRE_EIXOS_IAM", 
+"DESLOCAMENTO_ENTRE_EIXOS_SHIFT", 
+"TRACKING_ERROR_TE")
+
+indice <- c(18,19,20,21,22,23,24,25)
+
+nam <- 0
+for(i in 1:length(variaveis)) { 
+  nam <- paste("df_null_",variaveis[i],sep = "")
+  assign(nam,
+         df %>% where(., isNull(.[[indice[i]]])))
+  print(nam)
+  print(indice[i])
+}
+
+head(df_null_TRACKING_ERROR_TE)
+
+#### PAREI AQUI
+
+nulos_TRACKING_ERROR_TE <- count(df_null_TRACKING_ERROR_TE)
+nulos_TRACKING_ERROR_TE
+
+perc_TRACKING_ERROR_TE <- paste(round((nulos_CAVA_RODA/total)*100,0),"%",sep="")
+
+perc_TRACKING_ERROR_TE
+
+# O percentual de dados faltando para CAVA_RODA é de 20%
+
+gb_df_null_CAVA_RODA <- groupBy(df_null_CAVA_RODA, df_null_CAVA_RODA$Dia)
+
+nNull_CAVA_RODA_by_DIA <- agg(gb_df_null_CAVA_RODA, Nulls_CAVA_RODA = n(df_null_CAVA_RODA$Dia))
+
+nNull_CAVA_RODA_by_DIA.dat <- collect(nNull_CAVA_RODA_by_DIA)
+nNull_CAVA_RODA_by_DIA.dat
+
+CAVA_RODA_order_by_date <- nNull_CAVA_RODA_by_DIA.dat[order(nNull_CAVA_RODA_by_DIA.dat$Dia),]
+CAVA_RODA_order_by_date
+
+full <- full_join(CAVA_RODA_order_by_date,
+                  ANGULO_FRISO_RODA_order_by_date,
+                  by = NULL)
+full
+
+# Gráfico de Full
+
+g_full <- ggplot(full, aes(x=Dia))+
+  geom_line(aes(y=Nulls_CAVA_RODA),color="green")+
+  geom_line(aes(y=Nulls_ANGULO_FRISO_RODA),color="red")+
+  ggtitle("Nulos nas variáveis por dia")+
+  xlab("Data (dias)")+
+  ylab("Total de Nulos")+
+  theme_dark()
+g_full
+
 
 ```
 
