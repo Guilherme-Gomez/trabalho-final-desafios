@@ -17,7 +17,9 @@ output:
 
 Turma: **FGV TBABD-8**  
 Professor: **Rafael Lychowski**  
-Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez** 
+Autores: **Davi Almeida Ferreira**,
+        **Jucelino** e
+        **Guilherme Rocha Gomez** 
 
 
 ```{r setup, include=FALSE}
@@ -296,7 +298,7 @@ nNull_CAVA_RODA_by_DIA.dat <- collect(nNull_CAVA_RODA_by_DIA)
 #nNull_CAVA_RODA_by_DIA.dat
 
 CAVA_RODA_order_by_date <- nNull_CAVA_RODA_by_DIA.dat[order(nNull_CAVA_RODA_by_DIA.dat$Dia),]
-CAVA_RODA_order_by_date
+#CAVA_RODA_order_by_date
 
 # O percentual de dados faltando para ANGULO_FRISO_RODA é de 10%
 
@@ -309,12 +311,12 @@ nNull_ANGULO_FRISO_RODA_by_DIA.dat <- collect(nNull_ANGULO_FRISO_RODA_by_DIA)
 #nNull_ANGULO_FRISO_RODA_by_DIA.dat
 
 ANGULO_FRISO_RODA_order_by_date <- nNull_ANGULO_FRISO_RODA_by_DIA.dat[order(nNull_ANGULO_FRISO_RODA_by_DIA.dat$Dia),]
-ANGULO_FRISO_RODA_order_by_date
+#ANGULO_FRISO_RODA_order_by_date
 
 full <- full_join(CAVA_RODA_order_by_date,
                   ANGULO_FRISO_RODA_order_by_date,
                   by = NULL)
-full
+#full
 
 # Gráfico de Full
 
@@ -363,10 +365,10 @@ gb_df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE <- groupBy(df_null_ANGULO_ATAQUE_EI
 nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA <- agg(gb_df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, Nulls_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE = n(df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE$Dia))
 
 nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat <- collect(nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA)
-nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat
+#nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat
 
 ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_order_by_date <- nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat[order(nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat$Dia),]
-ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_order_by_date
+#ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_order_by_date
 
 # Avaliando os dados nulos para ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, indentificando se ocorreu alguma data com maior numero de dados nulos.
 
@@ -414,7 +416,7 @@ g_full <- ggplot(full, aes(x=Dia))+
   geom_line(aes(y=Nulls_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE),color="green")+
   geom_line(aes(y=Nulls_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE),color="red")+
   geom_line(aes(y=Nulls_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE),color="blue")+
-  ggtitle("Nulos nas variáveis por dia")+
+  ggtitle("Nulos nas variáveis AAEFT, AAETT e TPEFT por dia")+
   xlab("Data (dias)")+
   ylab("Total de Nulos")+
   theme_dark()
