@@ -67,8 +67,8 @@ library(viridis)
 # Iniciar sessão do SPARK
 # Separando as mehores configurações para os computadores que cada integrante do grupo usa.
 
-aluno <- "Guilherme"
-#aluno <- "Davi"
+#aluno <- "Guilherme"
+aluno <- "Davi"
 
 if (aluno == "Guilherme") {
 
@@ -177,7 +177,6 @@ printSchema(df)
 
 ##### Verificar a existencia de dados faltantes
 
-Foi verificado que nenhuma variável possui valores faltantes (Null, NaN, etc). Algumas variáveis possuem tipo incorreto ao apresentado na proposição do problema.
 
 ```{r include=FALSE}
 
@@ -213,22 +212,70 @@ test_vazio <- function(coluna){
 test_zero <- function(coluna){
   try(df %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
 
+total <- count(df)
+
+class(df$ROW_ID)
+
+x <- 0
+Tipo_de_dados <- 0
+
+for (i in 1:length(colnames(df))){
+  x[i] <- dtypes(df)[[i]][1]
+  Tipo_de_dados[i] <- dtypes(df)[[i]][2]
+}
+tipo_dados <- as.data.frame(Tipo_de_dados,x)
 
 cont_prob <- data.frame()
 for (coluna in colnames(df)){
 #As colunas no dataframe serão linhas neste relatório.
   
-  cont_prob[coluna,"nulo"]  <- ifelse(is.numeric(test_null(coluna)),test_null(coluna),0)
+#  cont_prob[coluna,"Tipo"]  <- tipo_dados[coluna,y]
+  cont_prob[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(coluna)),test_null(coluna),0)
+  cont_prob[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(coluna)),
+                                        paste(round(((test_null(coluna)/total)*100),0),"%",sep=""),
+                                        "0%")
   cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(coluna)),test_isNAN(coluna),0)
-  cont_prob[coluna,"vazio"] <- ifelse(is.numeric(test_vazio(coluna)),test_vazio(coluna),0)
-  cont_prob[coluna,"zero"]  <- ifelse(is.numeric(test_zero(coluna)),test_zero(coluna),0)
-  
+  cont_prob[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(coluna)),
+                                        paste(round(((test_isNAN(coluna)/total)*100),0),"%",sep=""),
+                                        "0%")
+  cont_prob[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(coluna)),test_vazio(coluna),0)
+  cont_prob[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(coluna)),
+                                        paste(round(((test_vazio(coluna)/total)*100),0),"%",sep=""),
+                                        "0%")
+  cont_prob[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(coluna)),test_zero(coluna),0)
+  cont_prob[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(coluna)),
+                                        paste(round(((test_zero(coluna)/total)*100),0),"%",sep=""),
+                                        "0%")
 }
+
+cont_prob <- cbind(cont_prob,tipo_dados)
 
 cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
 
+#### 
+
+```{r}
+# Avaliando os dados nulos para ANGULO_FRISO_RODA
+
+df_null_ANGULO_FRISO_RODA <- where(df, isNull(df$ANGULO_FRISO_RODA))
+
+nulos_ANGULO_FRISO_RODA <- count(df_null_ANGULO_FRISO_RODA)
+
+perc_nulos_ANGULO_FRISO_RODA <- paste(round((nulos_ANGULO_FRISO_RODA/total)*100,0),"%",sep="")
+
+perc_nulos_ANGULO_FRISO_RODA
+# O percentual de dados faltando para ANGULO_FRISO_RODA é de 10%
+
+gb_df_null_ANGULO_FRISO_RODA <- groupBy(df_null_ANGULO_FRISO_RODA, df_null_ANGULO_FRISO_RODA$CODIGO_VAGAO)
+
+nNull_ANGULO_FRISO_RODA_by_CVAGAO <- agg(gb_df_null_ANGULO_FRISO_RODA, Nulls = n(df_null_ANGULO_FRISO_RODA$CODIGO_VAGAO))
+
+nNull_ANGULO_FRISO_RODA_by_CVAGAO.dat <- collect(nNull_ANGULO_FRISO_RODA_by_CVAGAO)
+nNull_ANGULO_FRISO_RODA_by_CVAGAO.dat
+
+```
 
 #### Identificar as principais estatisticas da Amostra
 
@@ -492,12 +539,12 @@ sdf_vagao_trocas_roda_all %>%
 
 ```{r}
 
-df_sample %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
-df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
+df_sample %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) 
+df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100)
 
 grupo_angulo_null <- groupBy(df %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]])), df$CODIGO_RODA)
 df2 <- agg(grupo_angulo_null,count = n(df$CODIGO_RODA))
-df2 %>% head(1000) %>% View()
+df2 %>% head(1000)
 #Algumas rodas nunca tiveram medidas de ângulo
 #(5054164RIGHT,0960614RIGHT,6083714RIGHT,0995294RIGHT,5534531LEFT,5519574RIGHT,0867584RIGHT,6346311RIGHT,0809114RIGHT,5599823RIGHT)
 # O que fazer nestes casos?
@@ -548,14 +595,13 @@ c('0956094RIGHT','6241133RIGHT','0851232RIGHT','7011773RIGHT','0825071RIGHT','55
   fill('down', .direction = "down")
 
 
-) %>% 
-   View()
+)
 
 
 
-df_sample %>% where(.,isNull(.[["ALTURA_FRISO_RODA"]]))%>% head(100) %>% View()
-df_sample %>% where(.,isNull(.[["ESPESSURA_FRISO_RODA"]]))%>% head(100) %>% View()
-df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100) %>% View()
+df_sample %>% where(.,isNull(.[["ALTURA_FRISO_RODA"]]))%>% head(100) 
+df_sample %>% where(.,isNull(.[["ESPESSURA_FRISO_RODA"]]))%>% head(100)
+df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100)
 
 
 
@@ -570,9 +616,9 @@ df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100) %>% View()
 # TRACKING_ERROR_(TE)                     
 # SERPENTEAMENTO_(HUNTING)  
 
-df_sample %>% where(.,isNaN(.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]])) %>% head(100) %>% View()
-df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== "")  %>% head(100) %>% View()
-df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== 0)  %>% head(100) %>% View()
+#df_sample %>% where(.,isNaN(.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]])) %>% head(100) %>% View()
+#df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== "")  %>% head(100) %>% View()
+#df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== 0)  %>% head(100) %>% View()
 
 
 ```
