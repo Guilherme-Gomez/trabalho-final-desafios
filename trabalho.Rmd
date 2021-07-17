@@ -18,7 +18,7 @@ output:
 Turma: **FGV TBABD-8**  
 Professor: **Rafael Lychowski**  
 Autores: **Davi Almeida Ferreira**,
-        **Jucelino** e
+        **Jucelino Ribeiro Carvalho** e
         **Guilherme Rocha Gomez** 
 
 
@@ -72,6 +72,7 @@ library(ggfortify)
 # Separando as mehores configurações para os computadores que cada integrante do grupo usa.
 
 #aluno <- "Guilherme"
+#aluno <- "Juscelino"
 aluno <- "Davi"
 
 if (aluno == "Guilherme") {
@@ -137,7 +138,8 @@ schema <- structType(
   structField("DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)", "double"),
   structField("TRACKING_ERROR_(TE)", "double"),
   structField("SERPENTEAMENTO_(HUNTING)", "double"),
-  structField("friso_baixo", "double")
+  structField("friso_baixo", "integer"),
+  structField("FRISO_MENOR_QUE_26", "integer")
 )
 
 df <- SparkR::read.df(path = pathfile,
@@ -152,6 +154,9 @@ cache(df)
 
 #Criando novas colunas pelo método mais comum.
 df$friso_baixo <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,1,0)
+
+#Criando novas colunas pelo método mais comum.
+df$FRISO_MENOR_QUE_26 <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,"YES","NO")
 
 #Criando novas colunas e escolhendo o tipo de dado usanod withColumn.
 df <- df %>% 
@@ -203,18 +208,18 @@ col_class <- 0
 ```{r, cache=TRUE}
 
 #Verificando qualidade dos dados.
+# Davi - modifiquei a função para poder ser utilizada com mais de um data_frame
+test_null <- function(data_frame,coluna){
+   try(data_frame %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)}
 
-test_null <- function(coluna){
-   try(df %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)}
+test_isNAN <- function(data_frame,coluna){
+  try(data_frame %>% where(.,isNaN(.[[coluna]]))%>%count(.), silent = TRUE)}
 
-test_isNAN <- function(coluna){
-  try(df %>% where(.,isNaN(.[[coluna]]))%>%count(.), silent = TRUE)}
+test_vazio <- function(data_frame,coluna){
+  try(data_frame %>% where(.,.[[coluna]]== "")  %>% count(.), silent = TRUE)}
 
-test_vazio <- function(coluna){
-  try(df %>% where(.,.[[coluna]]== "")  %>% count(.), silent = TRUE)}
-
-test_zero <- function(coluna){
-  try(df %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
+test_zero <- function(data_frame,coluna){
+  try(data_frame %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
 
 total <- count(df)
 
@@ -223,6 +228,7 @@ class(df$ROW_ID)
 x <- 0
 Tipo_de_dados <- 0
 
+# Criando a coluna de tipo de dados
 for (i in 1:length(colnames(df))){
   x[i] <- dtypes(df)[[i]][1]
   Tipo_de_dados[i] <- dtypes(df)[[i]][2]
@@ -233,22 +239,21 @@ cont_prob <- data.frame()
 for (coluna in colnames(df)){
 #As colunas no dataframe serão linhas neste relatório.
   
-#  cont_prob[coluna,"Tipo"]  <- tipo_dados[coluna,y]
-  cont_prob[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(coluna)),test_null(coluna),0)
-  cont_prob[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(coluna)),
-                                        paste(round(((test_null(coluna)/total)*100),0),"%",sep=""),
+  cont_prob[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(df,coluna)),test_null(df,coluna),0)
+  cont_prob[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(df,coluna)),
+                                        paste(round(((test_null(df,coluna)/total)*100),2),"%",sep=""),
                                         "0%")
-  cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(coluna)),test_isNAN(coluna),0)
-  cont_prob[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(coluna)),
-                                        paste(round(((test_isNAN(coluna)/total)*100),0),"%",sep=""),
+  cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(df,coluna)),test_isNAN(df,coluna),0)
+  cont_prob[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(df,coluna)),
+                                        paste(round(((test_isNAN(df,coluna)/total)*100),2),"%",sep=""),
                                         "0%")
-  cont_prob[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(coluna)),test_vazio(coluna),0)
-  cont_prob[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(coluna)),
-                                        paste(round(((test_vazio(coluna)/total)*100),0),"%",sep=""),
+  cont_prob[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(df,coluna)),test_vazio(df,coluna),0)
+  cont_prob[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(df,coluna)),
+                                        paste(round(((test_vazio(df,coluna)/total)*100),2),"%",sep=""),
                                         "0%")
-  cont_prob[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(coluna)),test_zero(coluna),0)
-  cont_prob[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(coluna)),
-                                        paste(round(((test_zero(coluna)/total)*100),0),"%",sep=""),
+  cont_prob[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(df,coluna)),test_zero(df,coluna),0)
+  cont_prob[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(df,coluna)),
+                                        paste(round(((test_zero(df,coluna)/total)*100),2),"%",sep=""),
                                         "0%")
 }
 
@@ -427,33 +432,159 @@ g_full
 
 Essas variaveis todas apresentaram um comportamento igual, ou seja, todas os casos nulos ocorreram no mesmo periodo
 
-#### Identificar as principais estatisticas da Amostra
+##### Realizando limpeza dos dados
+
+```{r Davi 1}
+
+#Limpando os dados nulos das colunas
+#colnames(df)
+
+dim(df)[1] %>% paste("Total de dados da base original ",.,sep="") %>% print()
+
+# Retirando os dados nulos de CAVA_RODA (20.46% da base)
+df_clean <- df %>% where(.,!isNull(.[[17]]))
+# Retirando os dados nulos de ANGULO_FRISO_RODA (9.69% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[14]]))
+# Retirando os dados nulos de ESPESSURA_FRISO_RODA (0.05% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[16]]))
+# Retirando os dados nulos de ALTURA_FRISO_RODA (0.01% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[15]]))
+# Retirando os dados nulos de TRACKING_ERROR_(TE) (0.21% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[25]]))
+
+dim(df_clean)[1] %>% paste("Total de dados da base limpa ",.,sep="") %>% print()
+
+# Redução dos dados
+reduc <- round(((dim(df_clean)[1]/dim(df)[1])-1)*100,2) 
+reduc <- paste("Redução dos dados de ",-reduc,"%",sep="")
+print(reduc)
+
+# Criando a coluna de tipo de dados
+for (i in 1:length(colnames(df_clean))){
+  x[i] <- dtypes(df_clean)[[i]][1]
+  Tipo_de_dados[i] <- dtypes(df_clean)[[i]][2]
+}
+tipo_dados <- as.data.frame(Tipo_de_dados,x)
+
+cont_clean <- data.frame()
+for (coluna in colnames(df_clean)){
+
+    cont_clean[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(df_clean,coluna)),test_null(df_clean,coluna),0)
+  cont_clean[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(df_clean,coluna)),
+                                        paste(round(((test_null(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_clean[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(df_clean,coluna)),test_isNAN(df_clean,coluna),0)
+  cont_clean[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(df_clean,coluna)),
+                                        paste(round(((test_isNAN(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_clean[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(df_clean,coluna)),test_vazio(df_clean,coluna),0)
+  cont_clean[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(df_clean,coluna)),
+                                        paste(round(((test_vazio(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_clean[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(df_clean,coluna)),test_zero(df_clean,coluna),0)
+  cont_clean[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(df_clean,coluna)),
+                                        paste(round(((test_zero(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+}
+
+cont_clean <- cbind(cont_clean,tipo_dados)
+
+cont_clean %>% kable(., format = "html",row.names = T, digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
+```
+
+##### Dados agrupados por Data
+
+```{r Davi 2}
+
+sdf_date <-summarize(groupBy(df_clean, df_clean$Dia), count = n(df_clean$ROW_ID)) 
+
+sdf_date <- collect(sdf_date)
+
+sdf_date <- sdf_date[order(sdf_date$Dia),]
 
 
-```{r}
-sumstats1 <- describe(df, "EIXO_VAGAO",
-                     "VELOCIDADE_ENTRADA_TREM",
-                     "VELOCIDADE_SAIDA_TREM")
-sumstats2 <- describe(df, "POSICAO_VAGAO_COMPOSICAO",
-                     "ANGULO_FRISO_RODA",
-                     "ALTURA_FRISO_RODA")
-sumstats3 <- describe(df, "ESPESSURA_FRISO_RODA",
-                     "CAVA_RODA",
-                     "ROTACAO_EIXO")
-sumstats4 <- describe(df, "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE",
-                     "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE")
-sumstats5 <- describe(df, "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE")
-sumstats6 <- describe(df, "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE")
-showDF(sumstats1)
-showDF(sumstats2)
-showDF(sumstats3)
-showDF(sumstats4)
-showDF(sumstats5)
-showDF(sumstats6)
+head(sdf_date)
+g_date <- ggplot(sdf_date, aes(x=Dia))+
+  geom_line(aes(y=count),color="green")+
+  ggtitle("Qntd de dados dia")+
+  xlab("Data (dias)")+
+  ylab("Total de dados")+
+  theme_dark()
+g_date
+```
+
+##### Qtd de dados por CODIGO_VAGAO
+
+```{r Davi 3}
+
+sdf_CODIGO_VAGAO <-summarize(groupBy(df_clean, df_clean$CODIGO_VAGAO), count = n(df_clean$ROW_ID)) 
+
+SparkR::head(arrange(sdf_CODIGO_VAGAO, desc(sdf_CODIGO_VAGAO$count)))
+
 ```
 
 
-```{r echo=FALSE}
+Criando planilha auxiliar para preparação dos dados
+```{r Davi 4}
+
+#Criando a planilha com as colunas relevantes
+sdf_clean = select(df_clean, 
+             df_clean$friso_baixo,
+             df_clean$FRISO_MENOR_QUE_26,
+             df_clean$ESPESSURA_FRISO_RODA,
+             df_clean$CODIGO_VAGAO,
+             df_clean$CODIGO_RODEIRO,
+             df_clean$CODIGO_RODA,
+             df_clean$LADO_RODA,
+             df_clean$EIXO_VAGAO,
+             df_clean$TRAIN_ID,
+             df_clean$SENTIDO_TREM,
+             df_clean$VELOCIDADE_ENTRADA_TREM,
+             df_clean$VELOCIDADE_SAIDA_TREM,
+             df_clean$POSICAO_VAGAO_COMPOSICAO,
+             df_clean$ANGULO_FRISO_RODA,
+             df_clean$ALTURA_FRISO_RODA,
+             df_clean$CAVA_RODA,
+             df_clean$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE,
+             df_clean$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE,
+             df_clean$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE,
+             df_clean$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE,
+             df_clean$ROTACAO_EIXO,
+             df_clean$`ALINHAMENTO_ENTRE_EIXOS_(IAM)`,
+             df_clean$`DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)`,
+             df_clean$`TRACKING_ERROR_(TE)`,
+             df_clean$`SERPENTEAMENTO_(HUNTING)`)
+
+#class(sdf_clean)
+```
+
+##### Qtd de dados por CODIGO_RODEIRO
+##### Qtd de dados por CODIGO_RODA
+##### Qtd de dados por EIXO_VAGAO
+##### Qtd de dados por CICLO_RODEIRO
+##### Qtd de dados por TRAIN_ID
+##### Qtd de dados por SENTIDO_TREM
+
+#### Identificar as principais estatisticas da Amostra
+
+
+```{r Davi 5}
+
+#colnames(sdf_clean)
+variaveis <- colnames(sdf_clean)[c(1,2,10:24)]
+variaveis
+
+for (coluna in variaveis){
+  nam <- paste("sumstats_",coluna,sep="")
+  assign(nam, describe(sdf_clean, as.character(coluna))) %>% showDF()
+}
+
+
+```
+
+
+```{r echo=FALSE include=FALSE}
 #Usando a função agg
 
 agg(df, velo_entrada_avg = avg(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
@@ -470,17 +601,16 @@ agg(df, alt_friso_max = max(df$ESPESSURA_FRISO_RODA)) %>% head()
 #Usando agg com agregação
 gb_sn <- groupBy(df, df$CODIGO_RODA)
 df2 <- agg(gb_sn, friso_avg = avg(df$ESPESSURA_FRISO_RODA), count = n(df$ESPESSURA_FRISO_RODA))
-head(df2)
+#head(df2)
 
 
 ```
 
-
 #### Identificar as principais correlações entre os dados
 
-```{r}
+```{r Davi 6}
 # Medindo a correlação entre ESPESSURA FRISO RODA E EIXO VAGAO
-corr_EFR_EV <- corr(df, "ESPESSURA_FRISO_RODA", "EIXO_VAGAO")
+corr_EFR_EV <- corr(sdf_clean, "ESPESSURA_FRISO_RODA", "EIXO_VAGAO")
 corr_EFR_EV
 
 
@@ -619,13 +749,16 @@ for (vagao in vagoes$CODIGO_VAGAO){
 
 ```
 
+```{r Guilherme 1}
+#Guilherme
 
 
+```
 
 
 
 ```{r eval=FALSE, include=FALSE}
-df_list <- randomSplit(sdf, c(7,3), 2)
+df_list <- randomSplit(sdf_clean, c(7,3), 2)
 df_train <- df_list[[1]]
 df_test <- df_list[[2]]
 
@@ -684,10 +817,18 @@ sdf_vagao_trocas_roda_all %>%
 
 ### Preparação dos Dados
 
+#### Particionando os dados 70% para treino e 30% para teste
 
+```{r Davi 7}
+# Dividindo entre treino e teste
 
+df_list <- randomSplit(sdf_clean, c(7,3),2)
 
-```{r}
+df_train <- df_list[[1]]
+df_test <- df_list[[2]]
+```
+
+```{r include=FALSE}
 
 df_sample %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) 
 df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100)
@@ -774,19 +915,51 @@ df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100)
 ```
 
 
-
 #### Normalizaçao?
 #### PCA/Redução de dimensionalidade
 
 ### Modelagem
 
+#### Regressão logística
+
+```{r Davi 8, cache=TRUE}
+# Modelo básico de regreção logística
+head(df_train)
+colnames(df_train)
+
+model <- spark.logit(df_train, FRISO_MENOR_QUE_26 ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       CODIGO_VAGAO, 
+                     regParam = 0.5)
+summary <- summary(model)
+summary
+```
+
 #### Classificação
-##### Regressão logística
+
 ##### Árvore de decisão
 ##### Redes neurais
 ##### Ensemble?
 
 ### Avaliação
+
+#### Regressão logística
+
+```{r Davi 9, cache=TRUE}
+# Modelo básico de regreção logística
+fitted <- predict(model, df_test)
+
+createOrReplaceTempView(fitted, "predictions")
+correct <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions WHERE prediction=FRISO_MENOR_QUE_26")
+
+
+acc = count(correct)/count(fitted)
+acc
+
+
+
+```
 
 ### Conclusão
 
