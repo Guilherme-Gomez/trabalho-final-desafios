@@ -17,7 +17,9 @@ output:
 
 Turma: **FGV TBABD-8**  
 Professor: **Rafael Lychowski**  
-Autores: **Davi Almeida Ferreira** e **Guilherme Rocha Gomez** 
+Autores: **Davi Almeida Ferreira**,
+        **Jucelino Ribeiro Carvalho** e
+        **Guilherme Rocha Gomez** 
 
 
 ```{r setup, include=FALSE}
@@ -52,7 +54,6 @@ A Vale pretende prever o desgaste de rodas de vagões e fornecer uma visão futu
 
 ### Entendimento dos Dados
 
-
 ```{r include=FALSE}
 # Importar bibliotecas que serão utilizadas no trabalho
 
@@ -64,13 +65,15 @@ library(gridExtra)
 library(kableExtra)
 library(hrbrthemes)
 library(viridis)
+library(tseries)
+library(ggfortify)
 
 # Iniciar sessão do SPARK
-# Separando as melhores configurações para os computadores que cada integrante do grupo usa.
+# Separando as mehores configurações para os computadores que cada integrante do grupo usa.
 
-aluno <- "Guilherme"
-#aluno <- "Davi"
-#aluno <- readline(prompt="Enter name: ")
+#aluno <- "Guilherme"
+#aluno <- "Juscelino"
+aluno <- "Davi"
 
 if (aluno == "Guilherme") {
 
@@ -104,7 +107,6 @@ sparkR.conf()
 
 ```
 
-
 ```{r include=FALSE}
 # Importar dataset 
 
@@ -136,7 +138,8 @@ schema <- structType(
   structField("DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)", "double"),
   structField("TRACKING_ERROR_(TE)", "double"),
   structField("SERPENTEAMENTO_(HUNTING)", "double"),
-  structField("friso_baixo", "double")
+  structField("friso_baixo", "integer"),
+  structField("FRISO_MENOR_QUE_26", "integer")
 )
 
 df <- SparkR::read.df(path = pathfile,
@@ -152,12 +155,15 @@ cache(df)
 #Criando novas colunas pelo método mais comum.
 df$friso_baixo <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,1,0)
 
-#Criando novas colunas e escolhendo o tipo de dado usando withColumn.
+#Criando novas colunas pelo método mais comum.
+df$FRISO_MENOR_QUE_26 <- SparkR::ifelse(df$ESPESSURA_FRISO_RODA<26,"YES","NO")
+
+#Criando novas colunas e escolhendo o tipo de dado usanod withColumn.
 df <- df %>% 
   withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date")) #%>% 
   #withColumn(.,"Dia",cast(df$DATA_HORA_LEITURA,"Date"))
 
-#Criando uma amostra dos dados para fazer simulações com um dateset mais leve.
+
 df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
 
 #read.df(sqlContext,)
@@ -180,7 +186,6 @@ printSchema(df)
 
 ##### Verificar a existencia de dados faltantes
 
-Há valores nulos nos campos dos resultados das medições. É notável que há erros em algumas linhaspara todas medições do T-BOGIE.  
 
 ```{r include=FALSE}
 
@@ -203,74 +208,373 @@ col_class <- 0
 ```{r, cache=TRUE}
 
 #Verificando qualidade dos dados.
+# Davi - modifiquei a função para poder ser utilizada com mais de um data_frame
+test_null <- function(data_frame,coluna){
+   try(data_frame %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)}
 
-#Funções que serão utilizadas dentro do loop para varrer o dataset e contabilizar os problemas.
-#Foi necessário utilizar o try, pois alguma funções retornam erro para variáveis do tipo date ou datetime.
-test_null <- function(coluna){
-   try(df %>% where(.,isNull(.[[coluna]]))%>%count(.), silent = TRUE)}
+test_isNAN <- function(data_frame,coluna){
+  try(data_frame %>% where(.,isNaN(.[[coluna]]))%>%count(.), silent = TRUE)}
 
-test_isNAN <- function(coluna){
-  try(df %>% where(.,isNaN(.[[coluna]]))%>%count(.), silent = TRUE)}
+test_vazio <- function(data_frame,coluna){
+  try(data_frame %>% where(.,.[[coluna]]== "")  %>% count(.), silent = TRUE)}
 
-test_vazio <- function(coluna){
-  try(df %>% where(.,.[[coluna]]== "")  %>% count(.), silent = TRUE)}
+test_zero <- function(data_frame,coluna){
+  try(data_frame %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
 
-test_zero <- function(coluna){
-  try(df %>% where(.,.[[coluna]]== 0)  %>% count(.), silent = TRUE)}
+total <- count(df)
 
-#Dataframe para contabilizar os erros dentro do loop.
+class(df$ROW_ID)
+
+x <- 0
+Tipo_de_dados <- 0
+
+# Criando a coluna de tipo de dados
+for (i in 1:length(colnames(df))){
+  x[i] <- dtypes(df)[[i]][1]
+  Tipo_de_dados[i] <- dtypes(df)[[i]][2]
+}
+tipo_dados <- as.data.frame(Tipo_de_dados,x)
+
 cont_prob <- data.frame()
 for (coluna in colnames(df)){
-#As colunas no dataframe são linhas neste relatório
-#Foi necessário criar uma condição para evitar a inclusão de textos (erros) no resultado.
+#As colunas no dataframe serão linhas neste relatório.
   
-  cont_prob[coluna,"nulo"]  <- ifelse(is.numeric(test_null(coluna)),test_null(coluna),0)
-  cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(coluna)),test_isNAN(coluna),0)
-  cont_prob[coluna,"vazio"] <- ifelse(is.numeric(test_vazio(coluna)),test_vazio(coluna),0)
-  cont_prob[coluna,"zero"]  <- ifelse(is.numeric(test_zero(coluna)),test_zero(coluna),0)
-  
+  cont_prob[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(df,coluna)),test_null(df,coluna),0)
+  cont_prob[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(df,coluna)),
+                                        paste(round(((test_null(df,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(df,coluna)),test_isNAN(df,coluna),0)
+  cont_prob[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(df,coluna)),
+                                        paste(round(((test_isNAN(df,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_prob[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(df,coluna)),test_vazio(df,coluna),0)
+  cont_prob[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(df,coluna)),
+                                        paste(round(((test_vazio(df,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_prob[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(df,coluna)),test_zero(df,coluna),0)
+  cont_prob[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(df,coluna)),
+                                        paste(round(((test_zero(df,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
 }
 
-#Print da tabela com a contabilização dos problemas.
+cont_prob <- cbind(cont_prob,tipo_dados)
+
 cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
 
+##### Avaliando os dados nulos
 
-#### Identificar as principais estatisticas da Amostra
+###### CAVA_RODA, ANGULO_FRiSO_RODA 
 
+CAVA_RODA: A variável com maior número de dados nulos foi a CAVA_RODA com 607.049 (20%) dados nulos. Com o objetivo de avaliar a estratégia de tratamento dos dados vamos realizar a distribuição de dados nulos em comparação com as outras variáveis.
+
+ANGULO_FRISO_RODA: A segunda variável com maior número de dados nulos foi a ANGULO_FRISO_RODA com 287.408 (10%) dados nulos em comparação as outras variáveis.
 
 ```{r}
-sumstats1 <- describe(df, "EIXO_VAGAO",
-                     "VELOCIDADE_ENTRADA_TREM",
-                     "VELOCIDADE_SAIDA_TREM")
-sumstats2 <- describe(df, "POSICAO_VAGAO_COMPOSICAO",
-                     "ANGULO_FRISO_RODA",
-                     "ALTURA_FRISO_RODA")
-sumstats3 <- describe(df, "ESPESSURA_FRISO_RODA",
-                     "CAVA_RODA",
-                     "ROTACAO_EIXO")
-sumstats4 <- describe(df, "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE",
-                     "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE")
-sumstats5 <- describe(df, "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE")
-sumstats6 <- describe(df, "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE")
-showDF(sumstats1)
-showDF(sumstats2)
-showDF(sumstats3)
-showDF(sumstats4)
-showDF(sumstats5)
-showDF(sumstats6)
+
+# Avaliando os dados nulos para CAVA_RODA, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+df_null_CAVA_RODA <- where(df, isNull(df$CAVA_RODA))
+
+nulos_CAVA_RODA <- count(df_null_CAVA_RODA)
+
+perc_nulos_CAVA_RODA <- paste(round((nulos_CAVA_RODA/total)*100,0),"%",sep="")
+
+#perc_nulos_CAVA_RODA
+
+# Avaliando os dados nulos para ANGULO_FRiSO_RODA, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+df_null_ANGULO_FRISO_RODA <- where(df, isNull(df$ANGULO_FRISO_RODA))
+
+nulos_ANGULO_FRISO_RODA <- count(df_null_ANGULO_FRISO_RODA)
+
+perc_nulos_ANGULO_FRISO_RODA <- paste(round((nulos_ANGULO_FRISO_RODA/total)*100,0),"%",sep="")
+
+#perc_nulos_ANGULO_FRISO_RODA
+
+# O percentual de dados faltando para CAVA_RODA é de 20%
+
+gb_df_null_CAVA_RODA <- groupBy(df_null_CAVA_RODA, df_null_CAVA_RODA$Dia)
+
+nNull_CAVA_RODA_by_DIA <- agg(gb_df_null_CAVA_RODA, Nulls_CAVA_RODA = n(df_null_CAVA_RODA$Dia))
+
+nNull_CAVA_RODA_by_DIA.dat <- collect(nNull_CAVA_RODA_by_DIA)
+#nNull_CAVA_RODA_by_DIA.dat
+
+CAVA_RODA_order_by_date <- nNull_CAVA_RODA_by_DIA.dat[order(nNull_CAVA_RODA_by_DIA.dat$Dia),]
+#CAVA_RODA_order_by_date
+
+# O percentual de dados faltando para ANGULO_FRISO_RODA é de 10%
+
+gb_df_null_ANGULO_FRISO_RODA <- groupBy(df_null_ANGULO_FRISO_RODA, df_null_ANGULO_FRISO_RODA$Dia)
+
+nNull_ANGULO_FRISO_RODA_by_DIA <- agg(gb_df_null_ANGULO_FRISO_RODA, 
+                                      Nulls_ANGULO_FRISO_RODA = n(df_null_ANGULO_FRISO_RODA$Dia))
+
+nNull_ANGULO_FRISO_RODA_by_DIA.dat <- collect(nNull_ANGULO_FRISO_RODA_by_DIA)
+#nNull_ANGULO_FRISO_RODA_by_DIA.dat
+
+ANGULO_FRISO_RODA_order_by_date <- nNull_ANGULO_FRISO_RODA_by_DIA.dat[order(nNull_ANGULO_FRISO_RODA_by_DIA.dat$Dia),]
+#ANGULO_FRISO_RODA_order_by_date
+
+full <- full_join(CAVA_RODA_order_by_date,
+                  ANGULO_FRISO_RODA_order_by_date,
+                  by = NULL)
+#full
+
+# Gráfico de Full
+
+g_full <- ggplot(full, aes(x=Dia))+
+  geom_line(aes(y=Nulls_CAVA_RODA),color="green")+
+  geom_line(aes(y=Nulls_ANGULO_FRISO_RODA),color="red")+
+  ggtitle("Nulos nas variáveis por dia")+
+  xlab("Data (dias)")+
+  ylab("Total de Nulos")+
+  theme_dark()
+g_full
+
+
+```
+
+Percebe-se um aumento significativo no número de dados núlos no final do período.
+
+###### ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE, ROTACAO_EIXO, ALINHAMENTO_ENTRE_EIXOS_(IAM), DESLOCAMENTO_ENTRE_EIXOS_(SHIFT) e TRACKING_ERROR_(TE)
+
+Essas variáveis apresentam 19.723 (1%) de valores nulos
+
+```{r}
+
+# Avaliando os dados nulos para CAVA_RODA, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+variaveis <- c("ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE",
+"ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE",
+"TRACKING_POSITION_EIXO_FRONTAL_TRUQUE",
+"TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE",
+"ROTACAO_EIXO", 
+"ALINHAMENTO_ENTRE_EIXOS_IAM", 
+"DESLOCAMENTO_ENTRE_EIXOS_SHIFT", 
+"TRACKING_ERROR_TE")
+
+#ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE
+# Avaliando os dados nulos para ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE <- where(df, isNull(df$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE))
+
+nulos_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE <- count(df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE)
+
+# O percentual de dados faltando para ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE é de 1%
+
+gb_df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE <- groupBy(df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE$Dia)
+
+nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA <- agg(gb_df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, Nulls_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE = n(df_null_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE$Dia))
+
+nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat <- collect(nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA)
+#nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat
+
+ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_order_by_date <- nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat[order(nNull_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_by_DIA.dat$Dia),]
+#ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_order_by_date
+
+# Avaliando os dados nulos para ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE <- where(df, isNull(df$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE))
+
+nulos_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE <- count(df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE)
+
+# O percentual de dados faltando para ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE é de 20%
+
+gb_df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE <- groupBy(df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE$Dia)
+
+nNull_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_by_DIA <- agg(gb_df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, Nulls_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE = n(df_null_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE$Dia))
+
+nNull_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_by_DIA.dat <- collect(nNull_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_by_DIA)
+#nNull_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_by_DIA.dat
+
+ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_order_by_date <- nNull_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_by_DIA.dat[order(nNull_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_by_DIA.dat$Dia),]
+#ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_order_by_date
+
+# Avaliando os dados nulos para TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, indentificando se ocorreu alguma data com maior numero de dados nulos.
+
+df_null_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE <- where(df, isNull(df$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE))
+
+# O percentual de dados faltando para TRACKING_POSITION_EIXO_FRONTAL_TRUQUE é de 20%
+
+gb_df_null_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE <- groupBy(df_null_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, df_null_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE$Dia)
+
+nNull_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_by_DIA <- agg(gb_df_null_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, Nulls_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE = n(df_null_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE$Dia))
+
+nNull_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_by_DIA.dat <- collect(nNull_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_by_DIA)
+#nNull_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_by_DIA.dat
+
+TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_order_by_date <- nNull_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_by_DIA.dat[order(nNull_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_by_DIA.dat$Dia),]
+#TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_order_by_date
+
+full <- full_join(ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE_order_by_date,
+                  ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE_order_by_date,
+                  by = NULL)
+
+full <- full_join(full,
+                  TRACKING_POSITION_EIXO_FRONTAL_TRUQUE_order_by_date,
+                  by= NULL)
+
+g_full <- ggplot(full, aes(x=Dia))+
+  geom_line(aes(y=Nulls_ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE),color="green")+
+  geom_line(aes(y=Nulls_ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE),color="red")+
+  geom_line(aes(y=Nulls_TRACKING_POSITION_EIXO_FRONTAL_TRUQUE),color="blue")+
+  ggtitle("Nulos nas variáveis AAEFT, AAETT e TPEFT por dia")+
+  xlab("Data (dias)")+
+  ylab("Total de Nulos")+
+  theme_dark()
+g_full
+
+
+```
+
+Essas variaveis todas apresentaram um comportamento igual, ou seja, todas os casos nulos ocorreram no mesmo periodo
+
+##### Realizando limpeza dos dados
+
+```{r Davi 1}
+
+#Limpando os dados nulos das colunas
+#colnames(df)
+
+dim(df)[1] %>% paste("Total de dados da base original ",.,sep="") %>% print()
+
+# Retirando os dados nulos de CAVA_RODA (20.46% da base)
+df_clean <- df %>% where(.,!isNull(.[[17]]))
+# Retirando os dados nulos de ANGULO_FRISO_RODA (9.69% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[14]]))
+# Retirando os dados nulos de ESPESSURA_FRISO_RODA (0.05% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[16]]))
+# Retirando os dados nulos de ALTURA_FRISO_RODA (0.01% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[15]]))
+# Retirando os dados nulos de TRACKING_ERROR_(TE) (0.21% da base)
+df_clean <- df_clean %>% where(.,!isNull(.[[25]]))
+
+dim(df_clean)[1] %>% paste("Total de dados da base limpa ",.,sep="") %>% print()
+
+# Redução dos dados
+reduc <- round(((dim(df_clean)[1]/dim(df)[1])-1)*100,2) 
+reduc <- paste("Redução dos dados de ",-reduc,"%",sep="")
+print(reduc)
+
+# Criando a coluna de tipo de dados
+for (i in 1:length(colnames(df_clean))){
+  x[i] <- dtypes(df_clean)[[i]][1]
+  Tipo_de_dados[i] <- dtypes(df_clean)[[i]][2]
+}
+tipo_dados <- as.data.frame(Tipo_de_dados,x)
+
+cont_clean <- data.frame()
+for (coluna in colnames(df_clean)){
+
+    cont_clean[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(df_clean,coluna)),test_null(df_clean,coluna),0)
+  cont_clean[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(df_clean,coluna)),
+                                        paste(round(((test_null(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_clean[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(df_clean,coluna)),test_isNAN(df_clean,coluna),0)
+  cont_clean[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(df_clean,coluna)),
+                                        paste(round(((test_isNAN(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_clean[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(df_clean,coluna)),test_vazio(df_clean,coluna),0)
+  cont_clean[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(df_clean,coluna)),
+                                        paste(round(((test_vazio(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+  cont_clean[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(df_clean,coluna)),test_zero(df_clean,coluna),0)
+  cont_clean[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(df_clean,coluna)),
+                                        paste(round(((test_zero(df_clean,coluna)/total)*100),2),"%",sep=""),
+                                        "0%")
+}
+
+cont_clean <- cbind(cont_clean,tipo_dados)
+
+cont_clean %>% kable(., format = "html",row.names = T, digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
+```
+
+##### Dados agrupados por Data
+
+```{r Davi 2}
+
+sdf_date <-summarize(groupBy(df_clean, df_clean$Dia), count = n(df_clean$ROW_ID)) 
+
+sdf_date <- collect(sdf_date)
+
+sdf_date <- sdf_date[order(sdf_date$Dia),]
+
+
+head(sdf_date)
+g_date <- ggplot(sdf_date, aes(x=Dia))+
+  geom_line(aes(y=count),color="green")+
+  ggtitle("Qntd de dados dia")+
+  xlab("Data (dias)")+
+  ylab("Total de dados")+
+  theme_dark()
+g_date
+```
+
+##### Qtd de dados por CODIGO_VAGAO
+
+```{r Davi 3}
+
+sdf_CODIGO_VAGAO <-summarize(groupBy(df_clean, df_clean$CODIGO_VAGAO), count = n(df_clean$ROW_ID)) 
+
+SparkR::head(arrange(sdf_CODIGO_VAGAO, desc(sdf_CODIGO_VAGAO$count)))
+
 ```
 
 
-```{r echo=FALSE}
+Criando planilha auxiliar para preparação dos dados
+```{r Davi 4}
 
+#Criando a planilha com as colunas relevantes
+sdf_clean = select(df_clean, 
+             df_clean$friso_baixo,
+             df_clean$FRISO_MENOR_QUE_26,
+             df_clean$ESPESSURA_FRISO_RODA,
+             df_clean$CODIGO_VAGAO,
+             df_clean$CODIGO_RODEIRO,
+             df_clean$CODIGO_RODA,
+             df_clean$LADO_RODA,
+             df_clean$EIXO_VAGAO,
+             df_clean$TRAIN_ID,
+             df_clean$SENTIDO_TREM,
+             df_clean$VELOCIDADE_ENTRADA_TREM,
+             df_clean$VELOCIDADE_SAIDA_TREM,
+             df_clean$POSICAO_VAGAO_COMPOSICAO,
+             df_clean$ANGULO_FRISO_RODA,
+             df_clean$ALTURA_FRISO_RODA,
+             df_clean$CAVA_RODA,
+             df_clean$ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE,
+             df_clean$ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE,
+             df_clean$TRACKING_POSITION_EIXO_FRONTAL_TRUQUE,
+             df_clean$TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE,
+             df_clean$ROTACAO_EIXO,
+             df_clean$`ALINHAMENTO_ENTRE_EIXOS_(IAM)`,
+             df_clean$`DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)`,
+             df_clean$`TRACKING_ERROR_(TE)`,
+             df_clean$`SERPENTEAMENTO_(HUNTING)`)
+
+#class(sdf_clean)
+```
+
+##### Qtd de dados por CODIGO_RODEIRO
+##### Qtd de dados por CODIGO_RODA
+##### Qtd de dados por EIXO_VAGAO
+##### Qtd de dados por CICLO_RODEIRO
+##### Qtd de dados por TRAIN_ID
+##### Qtd de dados por SENTIDO_TREM
+
+#### Identificar as principais estatisticas da Amostra
+
+```{r Guilherme 2}
+# Base Completa
 #Listando apenas as colunas que são numéricas.
-colunas_numeric <- cbind(coltypes(df),colnames(df)) %>% 
-  as.data.frame %>% 
-  dplyr::filter(.$V1=="numeric") %>% 
-  dplyr::select(medidas=V2)
-
+colunas_numeric <- cbind(coltypes(df),colnames(df)) %>%
+as.data.frame %>%
+dplyr::filter(.$V1=="numeric") %>%
+dplyr::select(medidas=V2)
 
 
 resumo_medidas <- data.frame()
@@ -279,26 +583,20 @@ resultado <- data.frame()
 for (coluna in colunas_numeric$medidas){
 #As colunas no dataframe são linhas neste relatório
 #utilizando os dados de amostras (samples) para ser mais ágil.
-  
-  resultado <- cbind(coluna,
-    
-              df_sample %>% agg(., 
-              media = avg(.[[coluna]]),
-              desvio_padrao = sd(.[[coluna]]),
-              variancia = var(.[[coluna]]),
-              maximo = max(.[[coluna]]),
-              minimo = min(.[[coluna]])) %>% 
-              as.data.frame())
-  
-  resumo_medidas <- rbind(resumo_medidas,resultado)
-  
-  }
-
+resultado <- cbind(coluna,
+df_sample %>% agg(.,
+media = avg(.[[coluna]]),
+desvio_padrao = sd(.[[coluna]]),
+variancia = var(.[[coluna]]),
+maximo = max(.[[coluna]]),
+minimo = min(.[[coluna]])) %>%
+as.data.frame())
+resumo_medidas <- rbind(resumo_medidas,resultado)
+}
 
 #Print da tabela resumo.
 resumo_medidas %>% kable(., format = "html",row.names = T, digits = 2) %>%
-  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
-
+kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 
 #Usando agg com agregação
@@ -306,18 +604,14 @@ resumo_medidas %>% kable(., format = "html",row.names = T, digits = 2) %>%
 # df2 <- agg(gb_sn, friso_avg = avg(df_sample$ESPESSURA_FRISO_RODA), count = n(df_sample$ESPESSURA_FRISO_RODA))
 # head(df2)
 
-
 ```
-
 
 #### Identificar as principais correlações entre os dados
 
-```{r}
+```{r Davi 6}
 # Medindo a correlação entre ESPESSURA FRISO RODA E EIXO VAGAO
-corr_EFR_EV <- corr(df, "ESPESSURA_FRISO_RODA", "EIXO_VAGAO")
+corr_EFR_EV <- corr(sdf_clean, "ESPESSURA_FRISO_RODA", "EIXO_VAGAO")
 corr_EFR_EV
-
-
 ```
 
 #### Construir visualizações
@@ -453,13 +747,16 @@ for (vagao in vagoes$CODIGO_VAGAO){
 
 ```
 
+```{r Guilherme 1}
+#Guilherme
 
 
+```
 
 
 
 ```{r eval=FALSE, include=FALSE}
-df_list <- randomSplit(sdf, c(7,3), 2)
+df_list <- randomSplit(sdf_clean, c(7,3), 2)
 df_train <- df_list[[1]]
 df_test <- df_list[[2]]
 
@@ -518,23 +815,31 @@ sdf_vagao_trocas_roda_all %>%
 
 ### Preparação dos Dados
 
+#### Particionando os dados 70% para treino e 30% para teste
 
+```{r Davi 7}
+# Dividindo entre treino e teste
 
+df_list <- randomSplit(sdf_clean, c(7,3),2)
 
-```{r}
+df_train <- df_list[[1]]
+df_test <- df_list[[2]]
+```
 
-df_sample %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
-df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) %>% View()
+```{r include=FALSE}
+
+df_sample %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100) 
+df_sample %>% where(.,!isNull(.[["ANGULO_FRISO_RODA"]]))%>% head(100)
 
 grupo_angulo_null <- groupBy(df %>% where(.,isNull(.[["ANGULO_FRISO_RODA"]])), df$CODIGO_RODA)
 df2 <- agg(grupo_angulo_null,count = n(df$CODIGO_RODA))
-df2 %>% head(1000) %>% View()
-#Algumas rodas nunca tiveram medidas de ângulo (20 medidas com NA)
+df2 %>% head(1000)
+#Algumas rodas nunca tiveram medidas de ângulo
 #(5054164RIGHT,0960614RIGHT,6083714RIGHT,0995294RIGHT,5534531LEFT,5519574RIGHT,0867584RIGHT,6346311RIGHT,0809114RIGHT,5599823RIGHT)
 # O que fazer nestes casos?
 
 
-#Exemplo de rodas com falta de dados e opções de completar com fill (dados de outras medições)
+#Exemplo de rodas com falta de dados e uma opção de completar com fill.
 
 cbind(
 df %>% 
@@ -579,14 +884,13 @@ c('0956094RIGHT','6241133RIGHT','0851232RIGHT','7011773RIGHT','0825071RIGHT','55
   fill('down', .direction = "down")
 
 
-) %>% 
-   View()
+)
 
 
 
-df_sample %>% where(.,isNull(.[["ALTURA_FRISO_RODA"]]))%>% head(100) %>% View()
-df_sample %>% where(.,isNull(.[["ESPESSURA_FRISO_RODA"]]))%>% head(100) %>% View()
-df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100) %>% View()
+df_sample %>% where(.,isNull(.[["ALTURA_FRISO_RODA"]]))%>% head(100) 
+df_sample %>% where(.,isNull(.[["ESPESSURA_FRISO_RODA"]]))%>% head(100)
+df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100)
 
 
 
@@ -601,29 +905,89 @@ df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100) %>% View()
 # TRACKING_ERROR_(TE)                     
 # SERPENTEAMENTO_(HUNTING)  
 
-df_sample %>% where(.,isNaN(.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]])) %>% head(100) %>% View()
-df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== "")  %>% head(100) %>% View()
-df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== 0)  %>% head(100) %>% View()
+#df_sample %>% where(.,isNaN(.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]])) %>% head(100) %>% View()
+#df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== "")  %>% head(100) %>% View()
+#df_sample %>% where(.,.[["ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE"]]== 0)  %>% head(100) %>% View()
 
 
 ```
 
 
-
-#### Normalizaçao?
 #### PCA/Redução de dimensionalidade
 
 ### Modelagem
 
 #### Classificação
+
 ##### Regressão logística
+
+```{r Davi 8, cache=TRUE}
+# Modelo básico de regreção logística
+#head(df_train)
+colnames(df_train)
+
+model <- spark.logit(df_train, FRISO_MENOR_QUE_26 ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       VELOCIDADE_ENTRADA_TREM+
+                       POSICAO_VAGAO_COMPOSICAO+
+                       ANGULO_FRISO_RODA+
+                       CAVA_RODA
+                       #ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       #ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       #TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       #TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       #ROTACAO_EIXO+
+                       #ALINHAMENTO_ENTRE_EIXOS_(IAM)+
+                       #DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)+
+                       #TRACKING_ERROR_(TE)+
+                       #SERPENTEAMENTO_(HUNTING)
+                     ,
+                     regParam = 0.5)
+
+summary <- summary(model)
+summary
+```
+
 ##### Árvore de decisão
+
+```{r Davi 10}
+model <- spark.randomForest(df_train, FRISO_MENOR_QUE_26 ~ 
+                              VELOCIDADE_ENTRADA_TREM, 
+                            "classification", numTrees = 5)
+summary <- summary(model)
+
+```
+
 ##### Redes neurais
 ##### Ensemble?
 
 ### Avaliação
 
+#### Regressão logística
+
+```{r Davi 9, cache=TRUE}
+# Modelo básico de regreção logística
+fitted <- predict(model, df_test)
+
+createOrReplaceTempView(fitted, "predictions")
+
+correct <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions WHERE prediction=FRISO_MENOR_QUE_26")
+head(correct)
+
+acc = count(correct)/count(fitted)
+acc
+```
+
+```{r Davi 11, cache=TRUE}
+fitted <- predict(model, df_test)
+
+createOrReplaceTempView(fitted, "predictions")
+correct <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions WHERE prediction=FRISO_MENOR_QUE_26")
+acc = count(correct)/count(fitted)
+acc
+
+```
+
 ### Conclusão
 
-
-resumo_medidas <- data.frame()
