@@ -57,6 +57,17 @@ A Vale pretende prever o desgaste de rodas de vagões e fornecer uma visão futu
 ```{r include=FALSE}
 # Importar bibliotecas que serão utilizadas no trabalho
 
+#install.packages("rJava")
+#install.packages("caret")
+#install.packages("mlbench")
+#install.packages("tidyverse")
+#install.packages("tseries")
+#install.packages("ggfortify")
+#install.packages("gridExtra")
+#install.packages("corrplot")
+#install.packages("PerformanceAnalytics")
+#install.packages("reshape2")
+
 library(caret)
 library(mlbench)
 library(dplyr)
@@ -67,6 +78,9 @@ library(hrbrthemes)
 library(viridis)
 library(tseries)
 library(ggfortify)
+library(corrplot)
+library(PerformanceAnalytics)
+library(reshape2)
 
 # Iniciar sessão do SPARK
 # Separando as mehores configurações para os computadores que cada integrante do grupo usa.
@@ -77,27 +91,38 @@ aluno <- "Davi"
 
 if (aluno == "Guilherme") {
 
-spark_path <-'C:/Guilherme/spark'
-if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
-  Sys.setenv(SPARK_HOME = spark_path)
-}
-library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
-sparkR.session(master = "local[*]", sparkConfig = 
-list(spark.driver.memory = "1g"))
+  spark_path <-'C:/Guilherme/spark'
+  if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
+    Sys.setenv(SPARK_HOME = spark_path)
+  }
+  library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
+  sparkR.session(master = "local[*]", sparkConfig = 
+  list(spark.driver.memory = "1g"))
+  
+  pathfile = "C:/Guilherme/FGV/Desafios e Requisitos dos Projetos Analiticos/EFC_WAYSIDES.csv"
 
-pathfile = "C:/Guilherme/FGV/Desafios e Requisitos dos Projetos Analiticos/EFC_WAYSIDES.csv"
+}else if (aluno == "Davi") {
+  library(SparkR)
+  
+  spark_path <-"C:/spark-3.1.2-bin-hadoop3.2"
+  if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
+    Sys.setenv(SPARK_HOME = spark_path)
+  }
+  sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "6g"))
+  
+  pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
+} else {
 
-}else{
+  spark_path <-'C:/spark-3.1.2-bin-hadoop3.2'
+  if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
+    Sys.setenv(SPARK_HOME = spark_path)
+  }
+  library(SparkR, lib.loc = c(file.path(Sys.getenv("SPARK_HOME"), "R", "lib")))
+  sparkR.session(master = "local[*]", sparkConfig = 
+  list(spark.driver.memory = "4g"))
+  
+  pathfile = "C:/Users/jusce/OneDrive/Documents/R/FGV/DesafiosReqProjeAnalit/Aula5/TrabalhoFinal/EFC_WAYSIDES.csv"
 
-library(SparkR)
-
-spark_path <-"C:/spark-3.1.2-bin-hadoop3.2"
-if (nchar(Sys.getenv("SPARK_HOME")) < 1) {
-  Sys.setenv(SPARK_HOME = spark_path)
-}
-sparkR.session(master = "local[*]", sparkConfig = list(spark.driver.memory = "6g"))
-
-pathfile <- "C:/trabalho-final-desafios/EFC_WAYSIDES.csv"
 }
 
 paste("Configuração para o computador do: ",aluno)
@@ -166,6 +191,18 @@ df <- df %>%
 
 df_sample <- df %>% sample(withReplacement = F,fraction = 0.0005)
 
+
+#Criando vetores com os nomes das colunas para os tipos texto e número.
+colunas_numeric <- cbind(coltypes(df),colnames(df)) %>%
+as.data.frame %>%
+dplyr::filter(.$V1=="numeric") %>%
+dplyr::select(medidas=V2)
+
+colunas_text <- cbind(coltypes(df),colnames(df)) %>%
+as.data.frame %>%
+dplyr::filter(.$V1!="numeric") %>%
+dplyr::select(medidas=V2)
+
 #read.df(sqlContext,)
 
 # Incluir o arquivo na memória para facilitar a interação
@@ -205,7 +242,7 @@ col_class <- 0
 ```
 
 
-```{r, cache=TRUE}
+```{r juscelino 1, cache=TRUE}
 
 #Verificando qualidade dos dados.
 # Davi - modifiquei a função para poder ser utilizada com mais de um data_frame
@@ -239,22 +276,28 @@ cont_prob <- data.frame()
 for (coluna in colnames(df)){
 #As colunas no dataframe serão linhas neste relatório.
   
-  cont_prob[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(df,coluna)),test_null(df,coluna),0)
-  cont_prob[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(df,coluna)),
-                                        paste(round(((test_null(df,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
-  cont_prob[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(df,coluna)),test_isNAN(df,coluna),0)
-  cont_prob[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(df,coluna)),
-                                        paste(round(((test_isNAN(df,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
-  cont_prob[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(df,coluna)),test_vazio(df,coluna),0)
-  cont_prob[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(df,coluna)),
-                                        paste(round(((test_vazio(df,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
-  cont_prob[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(df,coluna)),test_zero(df,coluna),0)
-  cont_prob[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(df,coluna)),
-                                        paste(round(((test_zero(df,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
+  cont_prob[coluna,"Nulo"] <- test_null(df,coluna)
+  cont_prob[coluna,"Nulo"] <- ifelse(is.numeric(cont_prob[coluna,"Nulo"]),
+                                      cont_prob[coluna,"Nulo"], 0)
+  cont_prob[coluna,"% Nulo"]  <- ifelse(is.numeric(cont_prob[coluna,"Nulo"]), paste(round(((cont_prob[coluna,"Nulo"]/total)*100),2),"%",sep=""), "0%")
+  
+  cont_prob[coluna,"isNAN"] <- test_isNAN(df,coluna)
+  cont_prob[coluna,"isNAN"] <- ifelse(is.numeric(cont_prob[coluna,"isNAN"]),
+                                      cont_prob[coluna,"isNAN"], 0)
+  cont_prob[coluna,"% isNAN"] <- ifelse(is.numeric(cont_prob[coluna,"isNAN"]), paste(round(((cont_prob[coluna,"isNAN"]/total)*100),2),"%",sep=""), "0%")
+  
+  cont_prob[coluna,"Vazio"] <- test_vazio(df,coluna)
+  cont_prob[coluna,"Vazio"] <- ifelse(is.numeric(cont_prob[coluna,"Vazio"]),
+                                      cont_prob[coluna,"Vazio"], 0)
+  
+  cont_prob[coluna,"% Vazio"] <- ifelse(is.numeric(cont_prob[coluna,"Vazio"]), paste(round(((cont_prob[coluna,"Vazio"]/total)*100),2),"%",sep=""), "0%")
+
+  cont_prob[coluna,"Zero"]  <- test_zero(df,coluna)
+  cont_prob[coluna,"Zero"]  <- ifelse(is.numeric(cont_prob[coluna,"Zero"]),
+                                      cont_prob[coluna,"Zero"],0)
+  
+  cont_prob[coluna,"% Zero"] <- ifelse(is.numeric(cont_prob[coluna,"Zero"]), paste(round(((cont_prob[coluna,"Zero"]/total)*100),2),"%",sep=""), "0%")
+  
 }
 
 cont_prob <- cbind(cont_prob,tipo_dados)
@@ -262,6 +305,7 @@ cont_prob <- cbind(cont_prob,tipo_dados)
 cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
+
 
 ##### Avaliando os dados nulos
 
@@ -434,7 +478,7 @@ Essas variaveis todas apresentaram um comportamento igual, ou seja, todas os cas
 
 ##### Realizando limpeza dos dados
 
-```{r Davi 1}
+```{r juscelino 2}
 
 #Limpando os dados nulos das colunas
 #colnames(df)
@@ -469,22 +513,28 @@ tipo_dados <- as.data.frame(Tipo_de_dados,x)
 cont_clean <- data.frame()
 for (coluna in colnames(df_clean)){
 
-    cont_clean[coluna,"Nulo"]  <- ifelse(is.numeric(test_null(df_clean,coluna)),test_null(df_clean,coluna),0)
-  cont_clean[coluna,"% Nulo"]  <- ifelse(is.numeric(test_null(df_clean,coluna)),
-                                        paste(round(((test_null(df_clean,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
-  cont_clean[coluna,"isNAN"] <-    ifelse(is.numeric(test_isNAN(df_clean,coluna)),test_isNAN(df_clean,coluna),0)
-  cont_clean[coluna,"% isNAN"]  <- ifelse(is.numeric(test_isNAN(df_clean,coluna)),
-                                        paste(round(((test_isNAN(df_clean,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
-  cont_clean[coluna,"Vazio"] <- ifelse(is.numeric(test_vazio(df_clean,coluna)),test_vazio(df_clean,coluna),0)
-  cont_clean[coluna,"% Vazio"]  <- ifelse(is.numeric(test_vazio(df_clean,coluna)),
-                                        paste(round(((test_vazio(df_clean,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
-  cont_clean[coluna,"Zero"]  <- ifelse(is.numeric(test_zero(df_clean,coluna)),test_zero(df_clean,coluna),0)
-  cont_clean[coluna,"% Zero"]  <- ifelse(is.numeric(test_zero(df_clean,coluna)),
-                                        paste(round(((test_zero(df_clean,coluna)/total)*100),2),"%",sep=""),
-                                        "0%")
+    cont_clean[coluna,"Nulo"] <- test_null(df_clean,coluna)
+  cont_clean[coluna,"Nulo"] <- ifelse(is.numeric(cont_clean[coluna,"Nulo"]),
+                                      cont_clean[coluna,"Nulo"], 0)
+  cont_clean[coluna,"% Nulo"]  <- ifelse(is.numeric(cont_clean[coluna,"Nulo"]), paste(round(((cont_clean[coluna,"Nulo"]/total)*100),2),"%",sep=""), "0%")
+  
+  cont_clean[coluna,"isNAN"] <- test_isNAN(df_clean)
+  cont_clean[coluna,"isNAN"] <- ifelse(is.numeric(cont_clean[coluna,"isNAN"]),
+                                      cont_clean[coluna,"isNAN"], 0)
+  cont_clean[coluna,"% isNAN"] <- ifelse(is.numeric(cont_clean[coluna,"isNAN"]), paste(round(((cont_clean[coluna,"isNAN"]/total)*100),2),"%",sep=""), "0%")
+  
+  cont_clean[coluna,"Vazio"] <- test_vazio(df_clean,coluna)
+  cont_clean[coluna,"Vazio"] <- ifelse(is.numeric(cont_clean[coluna,"Vazio"]),
+                                      cont_clean[coluna,"Vazio"], 0)
+  
+  cont_clean[coluna,"% Vazio"] <- ifelse(is.numeric(cont_clean[coluna,"Vazio"]), paste(round(((cont_clean[coluna,"Vazio"]/total)*100),2),"%",sep=""), "0%")
+
+  cont_clean[coluna,"Zero"]  <- test_zero(df_clean,coluna)
+  cont_clean[coluna,"Zero"]  <- ifelse(is.numeric(cont_clean[coluna,"Zero"]),
+                                      cont_clean[coluna,"Zero"],0)
+  
+  cont_clean[coluna,"% Zero"] <- ifelse(is.numeric(cont_clean[coluna,"Zero"]), paste(round(((cont_clean[coluna,"Zero"]/total)*100),2),"%",sep=""), "0%")
+  
 }
 
 cont_clean <- cbind(cont_clean,tipo_dados)
@@ -559,64 +609,131 @@ sdf_clean = select(df_clean,
 #class(sdf_clean)
 ```
 
-##### Qtd de dados por CODIGO_RODEIRO
-##### Qtd de dados por CODIGO_RODA
-##### Qtd de dados por EIXO_VAGAO
-##### Qtd de dados por CICLO_RODEIRO
-##### Qtd de dados por TRAIN_ID
-##### Qtd de dados por SENTIDO_TREM
-
 #### Identificar as principais estatisticas da Amostra
 
+```{r Guilherme 2}
+#Principais indicadores.
 
-```{r Davi 5}
+resumo_medidas <- data.frame()
+resultado <- data.frame()
 
-#colnames(sdf_clean)
-variaveis <- colnames(sdf_clean)[c(1,2,10:24)]
-variaveis
-
-for (coluna in variaveis){
-  nam <- paste("sumstats_",coluna,sep="")
-  assign(nam, describe(sdf_clean, as.character(coluna))) %>% showDF()
+for (coluna in colunas_numeric$medidas){
+#As colunas no dataframe são linhas neste relatório
+#utilizando os dados de amostras (samples) para ser mais ágil.
+resultado <- cbind(coluna,
+df_sample %>% agg(.,
+media = avg(.[[coluna]]),
+desvio_padrao = sd(.[[coluna]]),
+variancia = var(.[[coluna]]),
+maximo = max(.[[coluna]]),
+minimo = min(.[[coluna]])) %>%
+as.data.frame())
+resumo_medidas <- rbind(resumo_medidas,resultado)
 }
 
-
-```
-
-
-```{r echo=FALSE include=FALSE}
-#Usando a função agg
-
-agg(df, velo_entrada_avg = avg(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-agg(df, velo_entrada_sd = sd(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-agg(df, velo_entrada_var = var(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-agg(df, velo_entrada_max = max(df$VELOCIDADE_ENTRADA_TREM)) %>% head()
-
-agg(df, alt_friso_avg = avg(df$ESPESSURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_sd = sd(df$ESPESSURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_var = var(df$ESPESSURA_FRISO_RODA)) %>% head()
-agg(df, alt_friso_max = max(df$ESPESSURA_FRISO_RODA)) %>% head()
+#Print da tabela resumo.
+resumo_medidas %>% kable(., format = "html",row.names = T, digits = 2) %>%
+kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 
 #Usando agg com agregação
-gb_sn <- groupBy(df, df$CODIGO_RODA)
-df2 <- agg(gb_sn, friso_avg = avg(df$ESPESSURA_FRISO_RODA), count = n(df$ESPESSURA_FRISO_RODA))
-#head(df2)
-
-
-```
-
-#### Identificar as principais correlações entre os dados
-
-```{r Davi 6}
-# Medindo a correlação entre ESPESSURA FRISO RODA E EIXO VAGAO
-corr_EFR_EV <- corr(sdf_clean, "ESPESSURA_FRISO_RODA", "EIXO_VAGAO")
-corr_EFR_EV
-
+# gb_sn <- groupBy(df_sample, df_sample$CODIGO_RODA)
+# df2 <- agg(gb_sn, friso_avg = avg(df_sample$ESPESSURA_FRISO_RODA), count = n(df_sample$ESPESSURA_FRISO_RODA))
+# head(df2)
 
 ```
 
 #### Construir visualizações
+
+##### Identificar as principais correlações entre os dados
+
+```{r Davi 6, cache=TRUE}
+# Medindo a correlação entre ESPESSURA FRISO RODA E EIXO VAGAO
+dim(df_clean)
+
+sdf_numeric <- select(df_clean,
+                      "VELOCIDADE_ENTRADA_TREM",
+                     "VELOCIDADE_SAIDA_TREM",
+                     "ANGULO_FRISO_RODA",
+                     "ALTURA_FRISO_RODA",
+                     "ESPESSURA_FRISO_RODA",
+                     "CAVA_RODA",
+                     "ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE",
+                     "ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE",
+                     "TRACKING_POSITION_EIXO_FRONTAL_TRUQUE",
+                     "TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE",
+                     "ROTACAO_EIXO",
+                     "ALINHAMENTO_ENTRE_EIXOS_(IAM)",
+                     "DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)",
+                     "TRACKING_ERROR_(TE)") %>% 
+                       sample(.,withReplacement=FALSE,fraction = 0.01)%>% collect(.)
+
+
+colnames(sdf_numeric) <- c("VEL_ET",
+                           "VEL_ST",
+                           "ANG_FR",
+                           "ANG_FR",
+                           "ESP_FR",
+                           "CAV_R",
+                           "ANG_AEFT",
+                           "ANG_AETT",
+                           "TR_PEFT",
+                           "TR_PETT",
+                           "ROT_E",
+                           "ALI_EE",
+                           "DES_EE",
+                           "TR_ER")
+
+chart.Correlation(sdf_numeric, histogram=TRUE, pch=19)
+
+#cor(sdf_numeric)
+
+cormat <- round(cor(sdf_numeric),2)
+#cormat
+
+# Melt the correlation matrix
+melted_cormat <- melt(cormat)
+melted_cormat
+
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "light green", high = "red", mid = "yellow", 
+                       midpoint = 0.5, limit = c(0,1), space = "Lab", 
+                       name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, 
+                                   size = 12, hjust = 1))+
+  coord_fixed()
+
+# Outra visão da correlação. 
+ggheatmap + 
+  labs(title = "Mapa de correlação das variaveis")+
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    plot.title = element_text(hjust = 0.5))
+
+```
+VEL_ET - VELOCIDADE_ENTRADA_TREM
+VEL_ST - VELOCIDADE_SAIDA_TREM
+ANG_FR - ANGULO_FRISO_RODA
+ALT_FR - ALTURA_FRISO_RODA
+ESP_FR - ESPESSURA_FRISO_RODA
+CAV_R - CAVA_RODA
+ANG_AEFT - ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE
+ANG_AETT - ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE
+TR_PEFT - TRACKING_POSITION_EIXO_FRONTAL_TRUQUE
+TR_PETT - TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE
+ROT_E - ROTACAO_EIXO
+ALI_EE - ALINHAMENTO_ENTRE_EIXOS_(IAM)
+DES_EE - DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)
+TR_ER - TRACKING_ERROR_(TE)")
 
 Listados com top 10
 
@@ -651,7 +768,10 @@ sdf_vagao_trocas_roda <- sql("select
 sdf_vagao_trocas_roda_all <- sql(
 "
   select
-    *
+    *,
+    MONTH(Dia) Mes,
+    YEAR(Dia) Ano
+
   from
   tabela
   
@@ -673,12 +793,8 @@ sdf_vagao_trocas_roda_all <- sql(
 
     group by CODIGO_VAGAO
   )
-  
-  "
+    "
 )
-
-
-
 
 
 
@@ -788,45 +904,74 @@ df_test <- df_list[[2]]
 ```
 
 
-
-
-```{r}
-
-
-#sdf_RODEIRO_friso_baixo_all  %>% 
-#where(df,df$CODIGO_VAGAO=='515276') %>% 
-
+```{r Guilherme 6, message=FALSE, warning=FALSE}
 sdf_vagao_trocas_roda_all %>% 
+ withColumn("semana_ano",date_trunc("week",.$Dia)) %>%
  collect(.) %>% 
- ggplot( aes(x=as.character(Dia), y=ESPESSURA_FRISO_RODA, fill=as.character(Dia))) +
+ ggplot( aes(x=as.factor(semana_ano), y=ESPESSURA_FRISO_RODA, fill=as.factor(semana_ano))) +
    geom_boxplot() +
    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
-   geom_jitter(color="black", size=0.05, alpha=0.05) +
+   geom_jitter(color="black", size=0.001, alpha=0.01) +
    theme(
      legend.position="none",
      plot.title = element_text(size=11)
    ) +
    #scale_y_continuous(limits = c(0,100))+
-   ggtitle("ESPESSURA_FRISO_RODA Dia") +
-   xlab("")
-
-
-
+   ggtitle("ESPESSURA_FRISO_RODA Semana") +
+   xlab("")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
 
 
+```{r Guilherme 7, message=FALSE, warning=FALSE}
+
+sdf_vagao_trocas_roda_all %>% 
+ withColumn("mes_ano",date_trunc("month",.$Dia)) %>%
+ collect(.) %>% 
+ ggplot( aes(x=as.factor(mes_ano), y=ESPESSURA_FRISO_RODA, fill=as.factor(mes_ano))) +
+   geom_boxplot() +
+   scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+   geom_jitter(color="black", size=0.001, alpha=0.01) +
+   theme(
+     legend.position="none",
+     plot.title = element_text(size=11)
+   ) +
+   #scale_y_continuous(limits = c(0,100))+
+   ggtitle("ESPESSURA_FRISO_RODA Mês") +
+   xlab("")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
 ### Preparação dos Dados
 
-#### Particionando os dados 70% para treino e 30% para teste
+#### Particionando os dados 30% para treino e 70% para teste
 
 ```{r Davi 7}
 # Dividindo entre treino e teste
 
-df_list <- randomSplit(sdf_clean, c(7,3),2)
+df_list <- randomSplit(sdf_clean, c(3,7),2)
 
 df_train <- df_list[[1]]
 df_test <- df_list[[2]]
+
+# Base de Treino
+
+print(paste("A base de treino ficou com ",
+            dim(df_train)[1],
+            " o que equivale  ",
+            round((dim(df_train)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
+
+
+
+# Base de Teste
+
+print(paste("A base de testes ficou com ",
+            dim(df_test)[1],
+            " o que equivale a ",
+            round((dim(df_test)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
 ```
+
+
 
 ```{r include=FALSE}
 
@@ -915,49 +1060,107 @@ df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100)
 ```
 
 
-#### Normalizaçao?
 #### PCA/Redução de dimensionalidade
 
 ### Modelagem
 
-#### Regressão logística
+##### Regressão logística
 
 ```{r Davi 8, cache=TRUE}
-# Modelo básico de regreção logística
-head(df_train)
-colnames(df_train)
+# Modelo básico de regressão logística
+#head(df_train)
+#colnames(df_train)
 
-model <- spark.logit(df_train, FRISO_MENOR_QUE_26 ~ 
+model_rl <- spark.logit(df_train, FRISO_MENOR_QUE_26 ~ 
                        VELOCIDADE_ENTRADA_TREM+
                        VELOCIDADE_SAIDA_TREM+
-                       CODIGO_VAGAO, 
+                       VELOCIDADE_ENTRADA_TREM+
+                       POSICAO_VAGAO_COMPOSICAO+
+                       ANGULO_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO
+                       ,
                      regParam = 0.5)
-summary <- summary(model)
+
+summary <- summary(model_rl)
 summary
 ```
 
-#### Classificação
-
 ##### Árvore de decisão
+
+```{r Davi 10}
+model_rf <- spark.randomForest(df_train, FRISO_MENOR_QUE_26 ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       VELOCIDADE_ENTRADA_TREM+
+                       POSICAO_VAGAO_COMPOSICAO+
+                       ANGULO_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO
+                       ,
+                       "classification",
+                     numTrees = 10)
+
+summary <- summary(model_rf)
+summary
+```
+
 ##### Redes neurais
 ##### Ensemble?
 
 ### Avaliação
 
+
+```{r Davi 13, cache=TRUE}
+# benchmarking
+
+colnames(df_clean)
+bench <-summarize(groupBy(df_clean, 
+                          df_clean$FRISO_MENOR_QUE_26), 
+                          count = n(df_clean$ROW_ID))
+
+yes <- head(bench)[1,2]
+yes
+no <- head(bench)[2,2]
+no
+
+(yes/(yes+no))*100
+```
+
+
 #### Regressão logística
 
 ```{r Davi 9, cache=TRUE}
 # Modelo básico de regreção logística
-fitted <- predict(model, df_test)
+fitted_rl <- predict(model_rl, df_test)
 
-createOrReplaceTempView(fitted, "predictions")
+createOrReplaceTempView(fitted_rl, "predictions")
+
 correct <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions WHERE prediction=FRISO_MENOR_QUE_26")
+#head(correct)
 
+acc_rl = count(correct)/count(fitted_rl)
+acc_rl
+```
 
-acc = count(correct)/count(fitted)
-acc
+#### Random Forest
 
+```{r Davi 11, cache=TRUE}
+# Modelo básico de random forest
+fitted_rf <- predict(model_rf, df_test)
 
+createOrReplaceTempView(fitted_rf, "predictions")
+correct <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions WHERE prediction=FRISO_MENOR_QUE_26")
+acc_rf = count(correct)/count(fitted_rf)
+acc_rf
 
 ```
 
