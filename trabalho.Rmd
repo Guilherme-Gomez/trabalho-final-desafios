@@ -703,10 +703,13 @@ TR_ER - TRACKING_ERROR_(TE)")
 
 ### BoxPlot
 
-É possível notar um grande aumento no volume de dados e uma menor variância nos dados após o mês de Abril de 2018.
+* É possível notar um grande aumento no volume de dados e uma menor variância nos dados após o mês de Abril de 2018.  
+
+* O tamanho das composições aumentam na mesma data.
+    + Cada lote são 110 vagões, sendo em média 3 lotes.
 
 #### {.tabset .tabset-fade .tabset-pills}
-##### Mensal
+##### Friso Mensal
 
 ```{r Box_plot_mes, message=FALSE, warning=FALSE}
 
@@ -759,7 +762,7 @@ sdf_vagao_trocas_roda_all %>%
   geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
 ```
 
-##### Semanal
+##### Friso Semanal
 
 ```{r Box_plot_semana, message=FALSE, warning=FALSE}
 sdf_vagao_trocas_roda_all %>% 
@@ -780,6 +783,88 @@ sdf_vagao_trocas_roda_all %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
   geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
 ```
+
+
+##### Dim Lote Mensal
+
+```{r Box_plot_dim_mes, message=FALSE, warning=FALSE}
+createOrReplaceTempView(df, "tabela")
+
+sql(
+  "
+select TRAIN_ID, dia, count(*) qtd from
+      (
+        select TRAIN_ID, CODIGO_VAGAO, dia 
+        from tabela 
+        group by TRAIN_ID, CODIGO_VAGAO, dia
+      ) 
+group by TRAIN_ID, dia
+  "
+  ) %>% 
+ withColumn("mes_ano",date_trunc("month",.$DIA)) %>%
+ collect(.) %>% 
+ ggplot( aes(x=as.factor(mes_ano), y=qtd, fill=as.factor(mes_ano))) +
+   geom_boxplot() +
+   scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+   geom_jitter(color="black", size=0.001, alpha=0.01) +
+   theme(
+     legend.position="none",
+     plot.title = element_text(size=11)
+   ) +
+   #scale_y_continuous(limits = c(0,100))+
+   ggtitle("Tamanho das composições") +
+   xlab("")+
+   ylab("Qtd")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  #geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
+  
+  
+
+```
+
+
+
+
+##### Dim Lote Semanal
+
+```{r Box_plot_dim_semana, message=FALSE, warning=FALSE}
+createOrReplaceTempView(df, "tabela")
+
+sql(
+  "
+select TRAIN_ID, dia, count(*) qtd from
+      (
+        select TRAIN_ID, CODIGO_VAGAO, dia 
+        from tabela 
+        group by TRAIN_ID, CODIGO_VAGAO, dia
+      ) 
+group by TRAIN_ID, dia
+  "
+  ) %>% 
+ withColumn("semana_ano",date_trunc("week",.$DIA)) %>%
+ collect(.) %>% 
+ ggplot( aes(x=as.factor(semana_ano), y=qtd, fill=as.factor(semana_ano))) +
+   geom_boxplot() +
+   scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+   geom_jitter(color="black", size=0.001, alpha=0.01) +
+   theme(
+     legend.position="none",
+     plot.title = element_text(size=11)
+   ) +
+   #scale_y_continuous(limits = c(0,100))+
+   ggtitle("Tamanho das composições") +
+   xlab("")+
+   ylab("Qtd")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  #geom_hline(yintercept=26, linetype="dashed", color = "red", size=1)
+  
+  
+
+```
+
+
+
+
 
 
 ### Abertura Cenário 1
@@ -975,6 +1060,49 @@ myplots[[5]]
 
 
 
+```{r eval=FALSE, include=FALSE}
+
+#Trem com o maior número de rodas com o friso baixo.
+createOrReplaceTempView(where(df,df$TRAIN_ID=='25B7F2F33'), "tabela_pior_trem")
+
+# createOrReplaceTempView(where(df,df$TRAIN_ID=='25B2621FD'), "tabela_pior_trem")
+# createOrReplaceTempView(where(df,df$TRAIN_ID=='25B2F0558'), "tabela_pior_trem")
+# createOrReplaceTempView(where(df,df$TRAIN_ID=='25B3A93CC'), "tabela_pior_trem")
+
+vagoes <- sql("
+              select CODIGO_VAGAO,DIA
+              from tabela_pior_trem 
+              group by CODIGO_VAGAO,DIA
+              order by CODIGO_VAGAO,DIA desc") %>% collect()
+
+#Criando uma tabela com os dados dos vagões que estavam no trem que teve o maior número de rodas com friso baixo (considerando o pior trêm).
+
+createOrReplaceTempView(where(df,df$CODIGO_VAGAO %in% vagoes$CODIGO_VAGAO), "tabela_vagoes_do_pior_trem")
+
+tabela_all <- sql("select * from tabela_vagoes_do_pior_trem")
+
+tabela_rank <- sql("select CODIGO_VAGAO,DIA,  RANK() OVER (PARTITION BY CODIGO_VAGAO ORDER BY DIA desc)  Rank
+
+              from tabela_vagoes_do_pior_trem 
+              group by CODIGO_VAGAO,DIA
+              order by CODIGO_VAGAO,DIA desc
+")
+
+tabela_join <- join(tabela_all, tabela_rank, 
+     tabela_all$DIA==tabela_rank$DIA 
+     &
+    tabela_all$CODIGO_VAGAO==tabela_rank$CODIGO_VAGAO)
+
+
+tabela_join %>% drop(c("ROW_ID","DATA_HORA_LEITURA","CODIGO_VAGAO","CODIGO_RODEIRO","LADO_RODA","EIXO_VAGAO","CICLO_RODEIRO","SENTIDO_TREM","TRAIN_ID","POSICAO_VAGAO_COMPOSICAO")) %>% head(100) %>% View()
+
+#Foi necessário criar um rank pois as rodas tem medidas em dias diferentes. 
+
+tabela_join %>% drop(c("ROW_ID","DATA_HORA_LEITURA","CODIGO_VAGAO","CODIGO_RODEIRO","LADO_RODA","EIXO_VAGAO","CICLO_RODEIRO","SENTIDO_TREM","TRAIN_ID","POSICAO_VAGAO_COMPOSICAO")) %>% 
+  collect() %>% 
+  pivot_wider(names_from = c(CODIGO_RODA,Rank),values_from = colunas_numeric$medidas) %>% head(10) %>% View()
+
+```
 
 
 
