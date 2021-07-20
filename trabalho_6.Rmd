@@ -1093,7 +1093,7 @@ myplots[[5]]
 createOrReplaceTempView(where(df,df$TRAIN_ID=='25B7F2F33'), "tabela_pior_trem")
 
 #Simulando com menos dados
-# createOrReplaceTempView(where(df,df$CODIGO_VAGAO=='98161'), "tabela_pior_trem")
+#createOrReplaceTempView(where(df,df$CODIGO_VAGAO=='98161'), "tabela_pior_trem")
 
 # createOrReplaceTempView(where(df,df$TRAIN_ID=='25B2621FD'), "tabela_pior_trem")
 # createOrReplaceTempView(where(df,df$TRAIN_ID=='25B2F0558'), "tabela_pior_trem")
@@ -1111,6 +1111,7 @@ createOrReplaceTempView(where(df,df$CODIGO_VAGAO %in% vagoes$CODIGO_VAGAO), "tab
 
 tabela_all <- sql("select * from tabela_vagoes_do_pior_trem")
 
+#Criando uma tabela com o rank para classificar a "idade" da medição.
 tabela_rank <- sql("select CODIGO_VAGAO,DIA,  RANK() OVER (PARTITION BY CODIGO_VAGAO ORDER BY DIA desc)  Rank
 
               from tabela_vagoes_do_pior_trem 
@@ -1128,15 +1129,24 @@ tabela_join <- join(tabela_all, tabela_rank,
 #   collect() %>% 
 #   View()
 
-#Foi necessário criar um rank pois as rodas tem medidas em dias diferentes. 
-
-tabela_join %>% drop(c("ROW_ID","DATA_HORA_LEITURA","CODIGO_VAGAO","CODIGO_RODEIRO","LADO_RODA","EIXO_VAGAO","CICLO_RODEIRO","SENTIDO_TREM","TRAIN_ID","POSICAO_VAGAO_COMPOSICAO","DIA")) %>% 
+#Foi necessário criar um rank pois as rodas tem medidas em dias diferentes.
+library(stringr)
+df_experiencia <- tabela_join %>% drop(c("ROW_ID","DATA_HORA_LEITURA","CODIGO_VAGAO","CODIGO_RODEIRO","LADO_RODA","EIXO_VAGAO","CICLO_RODEIRO","SENTIDO_TREM","TRAIN_ID","POSICAO_VAGAO_COMPOSICAO","DIA")) %>% 
+#definindo o perído avaliação.
+  where(.,.$Rank<10) %>% 
   collect() %>% 
-  pivot_wider(names_from = c(Rank),values_from = c(colunas_numeric$medidas,"FRISO_MENOR_QUE_26")) %>%
+#usando o str_pad para conseguir organizar melhor as colunas.
+  dplyr::mutate(Rank_2=str_pad(.$Rank, 2, pad = "0")) %>% 
+  dplyr::select(-Rank) %>%
+  pivot_wider(names_from = c(Rank_2),values_from = c(colunas_numeric$medidas,"FRISO_MENOR_QUE_26")) %>%
   dplyr::select(sort(names(.))) %>%
-  dplyr::select(CODIGO_RODA,everything()) #%>% 
-  #View()
+  dplyr::select(CODIGO_RODA,FRISO_MENOR_QUE_26_01,everything()) %>% 
+#Removendo as colunas das medições atuais e mantendo a variável dependente.
+  dplyr::rename(FRISO_MENOR_QUE_26=FRISO_MENOR_QUE_26_01) %>% 
+  dplyr::select(-colnames(.[which(substr(colnames(.),nchar(colnames(.))-1,nchar(colnames(.)))=="01")]))
 
+head(df_experiencia)
+class(df_experiencia)
 ```
 
 
@@ -1516,7 +1526,7 @@ Escrever aqui o texto da conclusao
 ## Testes
 
 
-```{r Area_de_teste_Undersampling, echo=TRUE, cache=TRUE}
+```{r Area_de_teste_Undersampling, cache=TRUE}
 # Area para realizacao de testes
 # colunas_numeric
 #colnames(df_clean)
@@ -1610,7 +1620,9 @@ model_teste_rl <- spark.logit(df_train_teste, FRISO_BAIXO ~
 summary(model_teste_rl)
 
 fitted_teste_rl <- predict(model_teste_rl, df_test_teste)
+```
 
+```{r Area_de_teste_Undersampling_avaliacao}
 # Avaliacao
 
 createOrReplaceTempView(fitted_teste_rl, "predictions_teste")
@@ -1703,6 +1715,9 @@ summary(model_teste_rf)
 
 fitted_teste_rf <- predict(model_teste_rf, df_test_teste)
 
+```
+
+```{r Area_de_teste_Undersampling_RF_avaliacao}
 # Avaliacao
 
 createOrReplaceTempView(fitted_teste_rf, "predictions_teste")
