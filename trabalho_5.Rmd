@@ -232,7 +232,7 @@ printSchema(df)
 
 Criando uma amostra dos dados (1%) para utilização em análises
 
-```{r Sample}
+```{r Sample, cache=TRUE}
 nrowdf <- nrow(df)
 #nrowdf
 
@@ -384,6 +384,26 @@ g_full
 
 ```
 
+
+```{r eval=FALSE, include=FALSE}
+sdf_date <-summarize(groupBy(df_clean, df_clean$DIA), count = n(df_clean$ROW_ID)) 
+
+sdf_date <- collect(sdf_date)
+
+sdf_date <- sdf_date[order(sdf_date$DIA),]
+
+
+head(sdf_date)
+g_date <- ggplot(sdf_date, aes(x=DIA))+
+  geom_line(aes(y=count),color="green")+
+  ggtitle("Qntd de dados DIA")+
+  xlab("Data (DIAs)")+
+  ylab("Total de dados")+
+  theme_dark()
+g_date
+```
+
+
 Percebe-se um aumento significativo no número de dados nulos no final do período.
 
 #### ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, TRACKING_POSITION_EIXO_FRONTAL_TRUQUE, TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE, ROTACAO_EIXO, ALINHAMENTO_ENTRE_EIXOS_(IAM), DESLOCAMENTO_ENTRE_EIXOS_(SHIFT) e TRACKING_ERROR_(TE)
@@ -474,24 +494,6 @@ g_full <- ggplot(full, aes(x=DIA))+
   theme_dark()
 g_full
 
-```
-
-```{r eval=FALSE, include=FALSE}
-sdf_date <-summarize(groupBy(df_clean, df_clean$DIA), count = n(df_clean$ROW_ID)) 
-
-sdf_date <- collect(sdf_date)
-
-sdf_date <- sdf_date[order(sdf_date$DIA),]
-
-
-head(sdf_date)
-g_date <- ggplot(sdf_date, aes(x=DIA))+
-  geom_line(aes(y=count),color="green")+
-  ggtitle("Qntd de dados DIA")+
-  xlab("Data (DIAs)")+
-  ylab("Total de dados")+
-  theme_dark()
-g_date
 ```
 
 Essas variaveis todas apresentaram um comportamento igual, ou seja, todas os casos nulos ocorreram no mesmo periodo, como todos essas dados são do T-BOGIE, acreditamos que ocorreu uma falha nesse sistema de medição nesses períodos.
@@ -602,9 +604,9 @@ kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 Indentificamos que todas as variáveis possuem valor máximo e minimo, dentro dos limites esperados.
 
-### Construir visualizações
+### Visualizações
 
-#### Identificar as principais correlações entre os dados
+#### Principais correlações entre os dados numéricos
 
 ```{r Correlacao_entre_variaveis, cache=TRUE}
 # Medindo a correlação entre ESPESSURA FRISO RODA E EIXO VAGAO
@@ -718,6 +720,8 @@ TR_ER - TRACKING_ERROR_(TE)")
 
 #### Friso Mensal
 
+Criando tabelas auxiliares para geração de visualizações
+
 ```{r Box_plot_mes, message=FALSE, warning=FALSE}
 
 createOrReplaceTempView(df, "tabela")
@@ -830,8 +834,6 @@ group by TRAIN_ID, dia
 ```
 
 
-
-
 #### Dim Lote Semanal
 
 ```{r Box_plot_dim_semana, message=FALSE, warning=FALSE}
@@ -931,22 +933,31 @@ for (vagao in vagoes$CODIGO_VAGAO){
 
 
 #### Vagão_1
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[1]]
 ```
+
 #### Vagão_2
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[2]]
 ```
+
 #### Vagão_3
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[3]]
 ```
+
 #### Vagão_4
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[4]]
 ```
+
 #### Vagão_5
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[5]]
 ```
@@ -1041,22 +1052,31 @@ for (vagao in vagoes$CODIGO_VAGAO){
 
 
 #### Vagão_1
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[1]]
 ```
+
 #### Vagão_2
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[2]]
 ```
+
 #### Vagão_3
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[3]]
 ```
+
 #### Vagão_4
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[4]]
 ```
+
 #### Vagão_5
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 myplots[[5]]
 ```
@@ -1115,9 +1135,37 @@ tabela_join %>% drop(c("ROW_ID","DATA_HORA_LEITURA","CODIGO_VAGAO","CODIGO_RODEI
 ### Particionando os dados 30% para treino e 70% para teste
 
 ```{r Divisao_treino_teste}
+# Balanceamentos na base (Incluir balanceamentos aqui)
+
+#createOrReplaceTempView(where(df_clean,df_clean$DIA>='2018-08-21'), "final")
+
+createOrReplaceTempView(where(df,df$FRISO_BAIXO==1), "tabela_FRISO_BAIXO")
+createOrReplaceTempView(df_clean, "tabela")
+
+sdf_worst_train <- sql("
+  
+select  TRAIN_ID ,count(*) qtd
+       from tabela_FRISO_BAIXO
+       group by TRAIN_ID
+    order by qtd desc
+    limit 100"
+    )
+head(sdf_worst_train,100)
+
+cod_vagao <- sql("SELECT * 
+FROM tabela WHERE TRAIN_ID IN (SELECT TRAIN_ID FROM (select  TRAIN_ID ,count(*) qtd
+       from tabela_FRISO_BAIXO
+       group by TRAIN_ID
+    order by qtd desc
+    limit 100))")
+dim(cod_vagao)
+
+df_final <- cod_vagao
+
+
 # Dividindo entre treino e teste
 
-df_list <- randomSplit(df_clean, c(7,3),2)
+df_list <- randomSplit(df_final, c(2,8),2)
 
 df_train <- df_list[[1]]
 df_test <- df_list[[2]]
@@ -1127,45 +1175,60 @@ df_test <- df_list[[2]]
 print(paste("A base de treino ficou com ",
             dim(df_train)[1],
             " o que equivale  ",
-            round((dim(df_train)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
+            round((dim(df_train)[1]*100/dim(df_final)[1]),2)," % da base final",sep=""))
+
+createOrReplaceTempView(where(df_train,df_train$FRISO_BAIXO==1), "tabela_train_yes")
+createOrReplaceTempView(where(df_train,df_train$FRISO_BAIXO==0), "tabela_train_no")
+
+train_yes <- sql("SELECT COUNT(1) as YES_TRAIN FROM tabela_train_yes ") %>% head(1)
+train_no <- sql("SELECT COUNT(1) as NO_TRAIN FROM tabela_train_no ") %>% head(1)
+
+perc_train_yes <- round((train_yes*100)/(train_yes+train_no),2)
+paste("O percentual de YES na base treino e de ",perc_train_yes,"% da base final",sep="")
 
 # Base de Teste
 
 print(paste("A base de testes ficou com ",
             dim(df_test)[1],
             " o que equivale a ",
-            round((dim(df_test)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
+            round((dim(df_test)[1]*100/dim(df_final)[1]),2)," % da base final",sep=""))
 
-createOrReplaceTempView(where(df,df$Dia>='2018-08-21'), "tabela_ultimo_ciclo")
+createOrReplaceTempView(where(df_test,df_test$FRISO_BAIXO==1), "tabela_test_yes")
+createOrReplaceTempView(where(df_test,df_test$FRISO_BAIXO==0), "tabela_test_no")
 
+test_yes <- sql("SELECT COUNT(1) as YES_TEST FROM tabela_test_yes ") %>% head(1)
+test_no <- sql("SELECT COUNT(1) as NO_TEST FROM tabela_test_no ") %>% head(1)
+
+perc_test_yes <- round((test_yes*100)/(test_yes+train_no),2)
+paste("O percentual de YES na base teste e de ",perc_test_yes,"% da base final",sep="")
 ```
 
 
-```{r base_auxiliar}
+```{r base_auxiliar, eval=FALSE}
 # Dividindo entre treino e teste
 
 createOrReplaceTempView(where(df_clean,df_clean$DIA>='2018-08-21'), "tabela_ultimo_ciclo")
 tabela_aux <- sql("select * from tabela_ultimo_ciclo")
 
-df_list <- randomSplit(tabela_aux, c(7,3),2)
+df_list_aux <- randomSplit(tabela_aux, c(7,3),2)
 
-df_train <- df_list[[1]]
-df_test <- df_list[[2]]
+df_train_aux <- df_list[[1]]
+df_test_aux <- df_list[[2]]
 
-head(df_train)
+head(df_train_aux)
 # Base de Treino
 
 print(paste("A base de treino ficou com ",
-            dim(df_train)[1],
+            dim(df_train_aux)[1],
             " o que equivale  ",
-            round((dim(df_train)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
+            round((dim(df_train_aux)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
 
 # Base de Teste
 
 print(paste("A base de testes ficou com ",
-            dim(df_test)[1],
+            dim(df_test_aux)[1],
             " o que equivale a ",
-            round((dim(df_test)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
+            round((dim(df_test_aux)[1]*100/dim(df_clean)[1]),2)," % da base limpa",sep=""))
 
 
 
@@ -1263,50 +1326,12 @@ df_sample %>% where(.,isNull(.[["CAVA_RODA"]]))%>% head(100)
 
 ### Regressão logística
 
-```{r Modelo_basico_reg_log, eval=FALSE, cache=TRUE, include=FALSE}
+```{r Modelo_basico_reg_log, cache=TRUE, include=FALSE}
 # Modelo básico de regressão logística
 #head(df_train)
 #colnames(df_train)
-colunas_numeric
-
-createOrReplaceTempView(where(df,df$FRISO_MENOR_QUE_26=="YES"), "tabela_FRISO_BAIXO")
-createOrReplaceTempView(df_clean, "tabela")
-
-sdf_worst_train <- sql("
-  
-select  TRAIN_ID ,count(*) qtd
-       from tabela_FRISO_BAIXO
-       group by TRAIN_ID
-    order by qtd desc
-    limit 100"
-    )
-head(sdf_worst_train,100)
-
-
-total <- sql("SELECT COUNT(*) FROM tabela") %>%  head()
-total
-yes <- sql("SELECT COUNT(*) FROM tabela WHERE FRISO_MENOR_QUE_26='YES'") %>% head()
-no <- sql("SELECT COUNT(*) FROM tabela WHERE FRISO_MENOR_QUE_26='NO'") %>% head()
-
-cod_vagao <- sql("SELECT * 
-FROM tabela WHERE TRAIN_ID IN (SELECT TRAIN_ID FROM (select  TRAIN_ID ,count(*) qtd
-       from tabela_FRISO_BAIXO
-       group by TRAIN_ID
-    order by qtd desc
-    limit 100))")
-dim(cod_vagao)
-
-yes <- sql("SELECT COUNT(*) FROM cod_vagao WHERE FRISO_MENOR_QUE_26='YES'") %>% head()
-yes
-no <- sql("SELECT COUNT(*) FROM cod_vagao WHERE FRISO_MENOR_QUE_26='NO'") %>% head()
-no
 
 # Dividindo entre treino e teste
-
-df_list <- randomSplit(cod_vagao, c(8,2),2)
-
-df_train <- df_list[[1]]
-df_test <- df_list[[2]]
 
 model_rl <- spark.logit(df_train, FRISO_BAIXO ~ 
                        VELOCIDADE_ENTRADA_TREM+
@@ -1327,35 +1352,12 @@ model_rl <- spark.logit(df_train, FRISO_BAIXO ~
 
 summary(model_rl)
 
-fitted_rl <- predict(model_rl, df_train)
-
-createOrReplaceTempView(fitted_rl, "predictions_rl")
-
-sql("SELECT * FROM predictions_rl") %>% head(10000) %>% View()
-
-sql("SELECT COUNT(1) FROM predictions_rl 
-                    WHERE FRISO_BAIXO=1 AND prediction=1
-                    ") %>% head(1)
-
-
-avaliacao_TP[1]
-avaliacao_FP[1]
-avaliacao_FN[1]
-avaliacao_TN[1]
-
-dim(df_test)
-
-correct_rl <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions_rl WHERE prediction=FRISO_MENOR_QUE_26")
-#head(correct)
-
-acc_rl = count(correct_rl)/count(fitted_rl)
-acc_rl
 ```
 
 ### Árvore de decisão
 
 ```{r Modelo_basico_random_forest}
-model_rf <- spark.randomForest(df_train, FRISO_MENOR_QUE_26 ~ 
+model_rf <- spark.randomForest(df_train, FRISO_BAIXO ~ 
                        VELOCIDADE_ENTRADA_TREM+
                        VELOCIDADE_SAIDA_TREM+
                        ANGULO_FRISO_RODA+
@@ -1382,38 +1384,51 @@ summary(model_rf)
 
 ```{r Avalicao_regressao_logistica, eval=FALSE, cache=TRUE, include=FALSE}
 # Modelo básico de regressão logística
-fitted_rl <- predict(model_rl, df_train)
+fitted_rl <- predict(model_rl, df_test)
 
 createOrReplaceTempView(fitted_rl, "predictions_rl")
 
-avaliacao_TP <- sql("SELECT COUNT(1) FROM predictions_rl 
-                    WHERE FRISO_MENOR_QUE_26='YES' AND prediction='YES'
-                    ") %>% head(1)
+#dim(df_test)
 
-avaliacao_FP <- sql("SELECT COUNT(1) FROM predictions_rl 
-                    WHERE FRISO_MENOR_QUE_26='NO' AND prediction='YES'
-                    ") %>% head(1)
-
-avaliacao_TN <- sql("SELECT COUNT(1) FROM predictions_rl 
-                    WHERE FRISO_MENOR_QUE_26='NO' AND prediction='NO'
-                    ") %>% head(1)
-
-avaliacao_FN <- sql("SELECT COUNT(1) FROM predictions_rl 
-                    WHERE FRISO_MENOR_QUE_26='YES' AND prediction='NO'
-                    ") %>% head(1)
-
-avaliacao_TP[1]
-avaliacao_FP[1]
-avaliacao_FN[1]
-avaliacao_TN[1]
-
-dim(df_test)
-
-correct_rl <- sql("SELECT prediction, FRISO_MENOR_QUE_26 FROM predictions_rl WHERE prediction=FRISO_MENOR_QUE_26")
+correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
 #head(correct)
 
 acc_rl = count(correct_rl)/count(fitted_rl)
 acc_rl
+
+# Matriz de confusao
+conf_matrix <- data.frame()
+
+model_rl_TP <- sql("SELECT COUNT(1) as TRUE_POSITIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=1 AND prediction=1
+                    ") %>% head(1)
+
+#model_rl_TP[1,1]
+conf_matrix[1,1] <- model_rl_TP[1,1]
+
+model_rl_FP <- sql("SELECT COUNT(1) as FALSE_POSITIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=0 AND prediction=1
+                    ") %>% head(1)
+#model_rl_FP[1,1]
+conf_matrix[2,1] <- model_rl_FP[1,1]
+
+model_rl_TN <- sql("SELECT COUNT(1) as TRUE_NEGATIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=0 AND prediction=0
+                    ") %>% head(1)
+#model_rl_TN[1,1]
+conf_matrix[2,2] <- model_rl_TN[1,1]
+
+model_rl_FN <- sql("SELECT COUNT(1) as FALSE_NEGATIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=1 AND prediction=0
+                    ") %>% head(1)
+#model_rl_FN[1,1]
+conf_matrix[1,2] <- model_rl_FN[1,1]
+
+colnames(conf_matrix) <- c("PRED_TRUE","PRED_FALSE")
+rownames(conf_matrix) <- c("REAL_TRUE","REAL_FALSE")
+
+conf_matrix %>% kable(., format = "html",row.names = T, digits = 2) %>%
+kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 ```
 
 ### Random Forest
@@ -1424,36 +1439,167 @@ fitted_rf <- predict(model_rf, df_test)
 
 createOrReplaceTempView(fitted_rf, "predictions_rf")
 
-avaliacao_TP <- sql("SELECT COUNT(1) FROM predictions_rf 
-                    WHERE FRISO_MENOR_QUE_26='YES' AND prediction='YES'
-                    ") %>% head(1)
-
-avaliacao_FP <- sql("SELECT COUNT(1) FROM predictions_rf 
-                    WHERE FRISO_MENOR_QUE_26='NO' AND prediction='YES'
-                    ") %>% head(1)
-
-avaliacao_TN <- sql("SELECT COUNT(1) FROM predictions_rf 
-                    WHERE FRISO_MENOR_QUE_26='NO' AND prediction='NO'
-                    ") %>% head(1)
-
-avaliacao_FN <- sql("SELECT COUNT(1) FROM predictions_rf 
-                    WHERE FRISO_MENOR_QUE_26='YES' AND prediction='NO'
-                    ") %>% head(1)
-
-avaliacao_TP[1]
-avaliacao_FP[1]
-avaliacao_FN[1]
-avaliacao_TN[1]
-
-
-# %>% kable(., format = "html",row.names = T, digits = 2) %>%
-# kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
-
+correct_rf <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
 acc_rf = count(correct_rf)/count(fitted_rf)
 acc_rf
 
+# Matriz de confusao
+conf_matrix <- data.frame()
 
+model_rf_TP <- sql("SELECT COUNT(1) as TRUE_POSITIVE FROM predictions_rf 
+                    WHERE FRISO_BAIXO=1 AND prediction=1
+                    ") %>% head(1)
+
+model_rf_TP[1,1]
+conf_matrix[1,1] <- model_rf_TP[1,1]
+
+model_rf_FP <- sql("SELECT COUNT(1) as FALSE_POSITIVE FROM predictions_rf
+                    WHERE FRISO_BAIXO=0 AND prediction=1
+                    ") %>% head(1)
+model_rf_FP[1,1]
+conf_matrix[2,1] <- model_rf_FP[1,1]
+
+model_rf_TN <- sql("SELECT COUNT(1) as TRUE_NEGATIVE FROM predictions_rf 
+                    WHERE FRISO_BAIXO=0 AND prediction=0
+                    ") %>% head(1)
+model_rf_TN[1,1]
+conf_matrix[2,2] <- model_rf_TN[1,1]
+
+model_rf_FN <- sql("SELECT COUNT(1) as FALSE_NEGATIVE FROM predictions_rf 
+                    WHERE FRISO_BAIXO=1 AND prediction=0
+                    ") %>% head(1)
+model_rf_FN[1,1]
+conf_matrix[1,2] <- model_rf_FN[1,1]
+
+colnames(conf_matrix) <- c("PRED_TRUE","PRED_FALSE")
+rownames(conf_matrix) <- c("REAL_TRUE","REAL_FALSE")
+
+conf_matrix %>% kable(., format = "html",row.names = T, digits = 2) %>%
+kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 ```
 
 ## Conclusão
 
+Escrever aqui o texto da conclusao
+
+## Testes
+
+```{r Area_de_teste, eval=FALSE, cache=TRUE, include=FALSE}
+# Area para realizacao de testes
+#colunas_numeric
+
+createOrReplaceTempView(where(df,df$FRISO_MENOR_QUE_26=="YES"), "tabela_FRISO_BAIXO")
+createOrReplaceTempView(df_clean, "tabela")
+
+sdf_worst_train <- sql("
+  
+select  TRAIN_ID ,count(*) qtd
+       from tabela_FRISO_BAIXO
+       group by TRAIN_ID
+    order by qtd desc
+    limit 100"
+    )
+head(sdf_worst_train,100)
+
+
+total <- sql("SELECT COUNT(*) FROM tabela") %>%  head()
+total
+yes <- sql("SELECT COUNT(*) FROM tabela WHERE FRISO_BAIXO=1") %>% head()
+no <- sql("SELECT COUNT(*) FROM tabela WHERE FRISO_BAIXO=0") %>% head()
+
+cod_vagao <- sql("SELECT * 
+FROM tabela WHERE TRAIN_ID IN (SELECT TRAIN_ID FROM (select  TRAIN_ID ,count(*) qtd
+       from tabela_FRISO_BAIXO
+       group by TRAIN_ID
+    order by qtd desc
+    limit 100))")
+dim(cod_vagao)
+
+yes <- sql("SELECT COUNT(*) FROM cod_vagao WHERE FRISO_BAIXO=1") %>% head()
+yes
+no <- sql("SELECT COUNT(*) FROM cod_vagao WHERE FRISO_BAIXO=0") %>% head()
+no
+
+# Colocar tabela final para teste
+
+df_final_teste <- cod_vagao
+
+# Dividindo entre treino e teste
+
+df_list_teste <- randomSplit(df_final_teste, c(8,2),2)
+
+df_train_teste <- df_list[[1]]
+df_test_teste <- df_list[[2]]
+
+model_teste <- spark.logit(df_train, FRISO_BAIXO ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       ANGULO_FRISO_RODA+
+                       ALTURA_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO+
+                       ALINHAMENTO_ENTRE_EIXOS_IAM+
+                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
+                       TRACKING_ERROR_TE,
+                       thresholds = 0.5,
+                     regParam = 0.5)
+
+summary(model_teste)
+
+fitted_rl <- predict(model_teste, df_train)
+
+# Avaiacao
+
+createOrReplaceTempView(fitted_teste, "predictions_teste")
+
+sql("SELECT * FROM predictions_teste") %>% head(10000) %>% View()
+
+sql("SELECT COUNT(1) FROM predictions_teste 
+                    WHERE FRISO_BAIXO=1 AND prediction=1
+                    ") %>% head(1)
+
+dim(df_test)
+
+correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_teste WHERE prediction=FRISO_BAIXO")
+#head(correct)
+
+acc_rl = count(correct_rl)/count(fitted_rl)
+acc_rl
+
+# Matriz de confusao
+conf_matrix <- data.frame()
+
+model_rl_TP <- sql("SELECT COUNT(1) as TRUE_POSITIVE FROM predictions_teste 
+                    WHERE FRISO_BAIXO=1 AND prediction=1
+                    ") %>% head(1)
+
+#model_rl_TP[1,1]
+conf_matrix[1,1] <- model_rl_TP[1,1]
+
+model_rl_FP <- sql("SELECT COUNT(1) as FALSE_POSITIVE FROM predictions_teste 
+                    WHERE FRISO_BAIXO=0 AND prediction=1
+                    ") %>% head(1)
+#model_rl_FP[1,1]
+conf_matrix[2,1] <- model_rl_FP[1,1]
+
+model_rl_TN <- sql("SELECT COUNT(1) as TRUE_NEGATIVE FROM predictions_teste 
+                    WHERE FRISO_BAIXO=0 AND prediction=0
+                    ") %>% head(1)
+#model_rl_TN[1,1]
+conf_matrix[2,2] <- model_rl_TN[1,1]
+
+model_rl_FN <- sql("SELECT COUNT(1) as FALSE_NEGATIVE FROM predictions_teste 
+                    WHERE FRISO_BAIXO=1 AND prediction=0
+                    ") %>% head(1)
+#model_rl_FN[1,1]
+conf_matrix[1,2] <- model_rl_FN[1,1]
+
+colnames(conf_matrix) <- c("PRED_TRUE","PRED_FALSE")
+rownames(conf_matrix) <- c("REAL_TRUE","REAL_FALSE")
+
+conf_matrix %>% kable(., format = "html",row.names = T, digits = 2) %>%
+kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
