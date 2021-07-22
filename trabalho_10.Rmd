@@ -1884,6 +1884,7 @@ A utilização das tecnicas aprendidas no curso para visualizar os dados permiti
 
 
 
+
 1. Adaptação para utilizar o Spark
 2. Entendimento do negócio para entender a dinamica dos trens
 3. Importancia do balanceamento das base.
