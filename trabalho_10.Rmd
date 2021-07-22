@@ -17,8 +17,9 @@ output:
 
 Turma: **FGV TBABD-8**  
 Professor: **Rafael Lychowski**  
-Autores: **Davi Almeida Ferreira**,  
-**Guilherme Rocha Gomez** e
+Autores: 
+**Davi Almeida Ferreira**,  
+**Guilherme Rocha Gomez** e  
 **Juscelino Ribeiro Carvalho** 
 
 ```{r setup, include=FALSE}
@@ -238,8 +239,8 @@ Foram criadas as seguintes variáveis:
 
 **FRISO_BAIXO**: Indica com 1 ou 0 se a ESPESSURA_FRISO_RODA é maior ou menor que 26 mm. Utilizada como varivável DEPENDENTE nos modelos.  
 <br>
-**FRISO_MENOR_QUE_26**: Indica com YES ou NO se a ESPESSURA_FRISO_RODA é maior ou menor que 26 mm. Utilizada para análise exploratória.
-<br>
+**FRISO_MENOR_QUE_26**: Indica com YES ou NO se a ESPESSURA_FRISO_RODA é maior ou menor que 26 mm. Utilizada para análise exploratória.  
+<br>  
 **DIA**: Indica o dia (ANO/MÊS/DIA) da ocorrência do dado. Utilizada para análise exploratória e para ordenar o modelo.
 <br>
 
@@ -473,7 +474,7 @@ Em relação as variaveis provenientes da medição TBOGIE todas apresentaram um
 
 Por termos uma base de dados volumosa, a estratégia adotada foi eliminar da base limpa todos os dados nulos.
 
-Total de dados da base original: `r nrow(df)[1]` 
+Total de dados da base original: `r round(nrow(df)[1],0)` 
 
 ```{r Limpeza_dados_1}
 
@@ -493,7 +494,7 @@ df_clean <- df_clean %>% where(.,!isNull(.[[25]]))
 
 ```
 
-Total de dados da base limpa: `r nrow(df_clean)[1]` 
+Total de dados da base limpa: `r round(nrow(df_clean)[1],0)` 
 
 ```{r Limpeza_dados_2, include=FALSE}
 # Redução dos dados
@@ -558,8 +559,8 @@ Com o objetivo de verificar o comportamento geral dos dados verificamos as estat
 <br>
 É possível verificar pelas agregações abaixo que:
   + A média encontrada na variável FRISO_BAIXO foi menor para o LADO DIREITO do que para o LADO ESQUERDO.
-  + A média encontrada na variável FRISO_BAIXO foi maior para o EIXO 1 do que para os demais EIXOS.
-<br>
+  + A média encontrada na variável FRISO_BAIXO foi maior para o EIXO 1 do que para os demais EIXOS.  
+<br>  
 Com base nessa avaliação que diferencia os LADOS e os EIXOS entendemos que essas variáveis categóricas são importantes para a construção do modelo.
 
 Indentificamos que todas as variáveis possuem valor máximo e minimo, dentro dos limites esperados.
@@ -797,33 +798,15 @@ Em relação as variáveis numéricas, consideramos interessante verificar se ex
 
 Abreviações utilizadas
 
-ESP_FR - ESPESSURA_FRISO_RODA
-
-VEL_ET - VELOCIDADE_ENTRADA_TREM
-
-VEL_ST - VELOCIDADE_SAIDA_TREM
-
-ANG_FR - ANGULO_FRISO_RODA
-
-ALT_FR - ALTURA_FRISO_RODA
-
-CAV_R - CAVA_RODA
-
-ANG_AEFT - ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE
-
-ANG_AETT - ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE
-
-TR_PEFT - TRACKING_POSITION_EIXO_FRONTAL_TRUQUE
-
-TR_PETT - TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE
-
-ROT_E - ROTACAO_EIXO
-
-ALI_EE - ALINHAMENTO_ENTRE_EIXOS_(IAM)
-
-DES_EE - DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)
-
-TR_ER - TRACKING_ERROR_(TE)")
+| Abreviação | 	Coluna |  	 | Abreviação | 	Coluna | 	
+|------------|---------|  -  |------------|------------|
+| ESP_FR | ESPESSURA_FRISO_RODA	|  | ANG_AETT | ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE
+| VEL_ET | VELOCIDADE_ENTRADA_TREM |  | TR_PEFT | TRACKING_POSITION_EIXO_FRONTAL_TRUQUE
+| VEL_ST | VELOCIDADE_SAIDA_TREM |  | TR_PETT | TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE
+| ANG_FR | ANGULO_FRISO_RODA   |  | ROT_E | ROTACAO_EIXO
+| ALT_FR | ALTURA_FRISO_RODA  |  | ALI_EE | ALINHAMENTO_ENTRE_EIXOS_(IAM)
+| CAV_R | CAVA_RODA  |  | DES_EE | DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)
+| ANG_AEFT | ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE |  | TR_ER | TRACKING_ERROR_(TE)")
 <br>
 
 #### HeatMap de Correlações
@@ -970,6 +953,35 @@ sdf_vagao_trocas_roda_all %>%
 #### Friso Semanal
 
 ```{r Box_plot_semana, message=FALSE, warning=FALSE}
+createOrReplaceTempView(df, "tabela")
+sdf_vagao_trocas_roda_all <- sql(
+"
+  select
+    *
+  from
+  tabela
+  
+  where CODIGO_VAGAO in
+  (
+  select
+    CODIGO_VAGAO
+    
+      from tabela
+    where CODIGO_RODA != CICLO_RODEIRO
+          and
+          CODIGO_VAGAO in 
+              (select
+                  CODIGO_VAGAO
+                      from tabela
+                    where FRISO_BAIXO ==1
+                    group by CODIGO_VAGAO)
+
+
+    group by CODIGO_VAGAO
+  )
+    "
+)
+
 sdf_vagao_trocas_roda_all %>% 
  withColumn("semana_ano",date_trunc("week",.$DIA)) %>%
  collect(.) %>% 
@@ -1291,7 +1303,7 @@ myplots[[5]]
 
 Utilizamos 3 abordagens para realizar a preparação dos dados (ordenada na ordem de complexidade)
 
-  + Utilizar a base limpa (df_clean) sem alteração nos registros (df_clean)
+  + Utilizar a base limpa (df_clean) sem alteração nos registros (df_clean) com balanceamendo entre 0 e 1 
   + Utilizar a base limpa (df_clean) com shift de resultados agrupado por roda/dia (df_pivot_spark)
   
 #### Base Clean
@@ -1440,6 +1452,8 @@ ncol_pivot_spark <- ncol(df_pivot_spark)
 for (i in 1:ncol_pivot_spark){
   df_pivot_spark <- df_pivot_spark %>% where(.,!isNull(.[[i]]))
 }
+
+head(df_pivot_spark)
 
 #printSchema(df_pivot_spark)
 #class(df_pivot_spark)
@@ -1607,6 +1621,24 @@ summary(model_pivot_rf)
 
 ```{r Avalicao_regressao_logistica_clean, echo=TRUE, cache=TRUE}
 # Modelo básico de regressão logística
+model_clean_rl <- spark.logit(df_clean_train, FRISO_BAIXO ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       ANGULO_FRISO_RODA+
+                       ALTURA_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO+
+                       ALINHAMENTO_ENTRE_EIXOS_IAM+
+                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
+                       TRACKING_ERROR_TE,
+                       thresholds = 0.5,
+                     regParam = 0.5)
+
+
 fitted_rl <- predict(model_clean_rl, df_clean_test)
 
 createOrReplaceTempView(fitted_rl, "predictions_rl")
@@ -1655,19 +1687,27 @@ kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 
 acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
-acuracia
 precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-precisao
 sensibilidade <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-sensibilidade
 especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
-especificidade
 ```
+
+| Indicador | 	Coluna |  	
+|------------|---------| 
+| Acurácia | `r round(acuracia,2)`	| 
+| Precisao | `r round(precisao,2)`	| 
+| Sensibilidade | `r round(sensibilidade,2)`	| 
+| Especificidade | `r round(especificidade,2)`	| 
+
 
 #### Base pivot
 
 ```{r Avalicao_regressao_logistica_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
 # Modelo básico de regressão logística
+model_pivot_rl <- spark.logit(df_pivot_spark %>% drop("CODIGO_RODA"),
+                              FRISO_BAIXO ~ ., thresholds = 0.5,
+                     regParam = 0.5)
+
 fitted_rl <- predict(model_pivot_rl, df_pivot_spark_teste)
 
 createOrReplaceTempView(fitted_rl, "predictions_rl")
@@ -1716,15 +1756,17 @@ kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 
 acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
-acuracia
 precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-precisao
 sensibilidade <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-sensibilidade
 especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
-especificidade
 ```
 
+| Indicador | 	Coluna |  	
+|------------|---------| 
+| Acurácia | `r round(acuracia,2)`	| 
+| Precisao | `r round(precisao,2)`	| 
+| Sensibilidade | `r round(sensibilidade,2)`	| 
+| Especificidade | `r round(especificidade,2)`	| 
 
 ### Random Forest
 
@@ -1732,6 +1774,24 @@ especificidade
 
 ```{r Avaliacao_random_forest_clean, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
 # Modelo básico de random forest
+model_clean_rf <- spark.randomForest(df_clean_train, FRISO_BAIXO ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       ANGULO_FRISO_RODA+
+                       ALTURA_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO+
+                       ALINHAMENTO_ENTRE_EIXOS_IAM+
+                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
+                       TRACKING_ERROR_TE+
+                       SERPENTEAMENTO_HUNTING,
+                       "classification",
+                     numTrees = 10)
+
 fitted_rf <- predict(model_clean_rf, df_clean_test)
 
 createOrReplaceTempView(fitted_rf, "predictions_rf")
@@ -1776,19 +1836,24 @@ kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 
 acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
-acuracia
 precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-precisao
 sensibilidade <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-sensibilidade
 especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
-especificidade
 ```
+
+| Indicador | 	Coluna |  	
+|------------|---------| 
+| Acurácia | `r round(acuracia,2)`	| 
+| Precisao | `r round(precisao,2)`	| 
+| Sensibilidade | `r round(sensibilidade,2)`	| 
+| Especificidade | `r round(especificidade,2)`	| 
 
 #### Base pivot
 
 ```{r Avalicao_random_forest_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
 # Modelo básico de regressão logística
+model_pivot_rf <- spark.randomForest(df_pivot_spark %>% drop("CODIGO_RODA"), FRISO_BAIXO ~ ., "classification",  numTrees = 5)
+
 fitted_rf <- predict(model_pivot_rf, df_pivot_spark_teste)
 
 createOrReplaceTempView(fitted_rf, "predictions_rf")
@@ -1837,17 +1902,25 @@ kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 
 acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
-acuracia
 precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-precisao
 sensibilidade <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[1,2])
-sensibilidade
 especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
-especificidade
 ```
 
+| Indicador | 	Coluna |  	
+|------------|---------| 
+| Acurácia | `r round(acuracia,2)`	| 
+| Precisao | `r round(precisao,2)`	| 
+| Sensibilidade | `r round(sensibilidade,2)`	| 
+| Especificidade | `r round(especificidade,2)`	| 
 
 ## Conclusão
 
 Escrever aqui o texto da conclusao
+
+1. Adaptação para utilizar o Spark
+2. Entendimento do negócio para entender a dinamica dos trens
+3. Importancia do balanceamento das base.
+4. Utilização de solução criativa para balanceamento.
+5. Resultado da árvore mais preciso que a regressão logística.
 
