@@ -1,5 +1,5 @@
 ---
-title: "Desafios e Requisitos dos Projetos Analiticos"
+title: "Desafios e Requisitos dos Projetos Analíticos"
 authores: "Davi Almeida Ferreira, Guilherme Rocha Gomez e Juscelino Ribeiro Carvalho"
 date: "Julho de 2021"
 output:
@@ -41,10 +41,10 @@ A Vale pretende prever o desgaste de rodas de vagões e fornecer uma visão futu
 
 **Problema:** Prever se o friso da roda esta abaixo de 26 mm na próxima leitura.
 
-1. A área não tem visibilidade do que vai contecer com os ativos, antecipando as trocas;
+1. A área não tem visibilidade do que vai acontecer com os ativos, antecipando as trocas;
 2. A cada troca o rodeiro é usinado, e sua vida útil reduzida;
 3. Incapacidade de visualização de desgastes acelerados em toda a frota de vagões
-4. Muitos vagões apresentam reinciência de trocas, e os fatores não são bem claros;
+4. Muitos vagões apresentam reincidência de trocas, e os fatores não são bem claros;
 
 * Base de dados: EFC_WAYSIDES.csv
 * Variável dependente: ESPESSURA_FRISO_RODA
@@ -237,14 +237,14 @@ printSchema(df)
 
 Foram criadas as seguintes variáveis:
 
-**FRISO_BAIXO**: Indica com 1 ou 0 se a ESPESSURA_FRISO_RODA é maior ou menor que 26 mm. Utilizada como varivável DEPENDENTE nos modelos.  
+**FRISO_BAIXO**: Indica com 1 ou 0 se a ESPESSURA_FRISO_RODA é maior ou menor que 26 mm. Utilizada como variável DEPENDENTE nos modelos.  
 <br>
 **FRISO_MENOR_QUE_26**: Indica com YES ou NO se a ESPESSURA_FRISO_RODA é maior ou menor que 26 mm. Utilizada para análise exploratória.  
 <br>  
 **DIA**: Indica o dia (ANO/MÊS/DIA) da ocorrência do dado. Utilizada para análise exploratória e para ordenar o modelo.
 <br>
 
-### Verificar a existencia de dados faltantes
+### Verificar a existência de dados faltantes
 
 ```{r Vericacao_da_qualidade_dos_dados, cache=TRUE}
 
@@ -310,7 +310,7 @@ cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
 
-Verificamos a concentração de dados nulos nas variaveis CAVA_RODA, ANGULO_FRISO_RODA e nas variaveis do TBOGIE
+Verificamos a concentração de dados nulos nas variáveis CAVA_RODA, ANGULO_FRISO_RODA e nas variáveis do TBOGIE
 
 ### Avaliando os dados nulos
 
@@ -387,7 +387,7 @@ g_full
 
 ```
 
-Como podemos perceber a ocorrência de dados nulos é distribuido por todo o periodo de medição sendo que ocorreu uma acentuação nos erros no segundo semestre de 2018. Essa acentuação é proporcional ao aumento do número de dados da amostra que aumentou significativamente no período. 
+Como podemos perceber a ocorrência de dados nulos é distribuído por todo o período de medição sendo que ocorreu uma acentuação nos erros no segundo semestre de 2018. Essa acentuação é proporcional ao aumento do número de dados da amostra que aumentou significativamente no período. 
 
 Avaliando as variáveis de TBOGIE  <br>
 ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, TRACKING_POSITION_EIXO_FRONTAL_TRUQUE.
@@ -468,7 +468,7 @@ g_full
 
 ```
 
-Em relação as variaveis provenientes da medição TBOGIE todas apresentaram um comportamento igual, ou seja, todas os casos nulos ocorreram no mesmo periodo, como todos essas dados são do T-BOGIE, acreditamos que ocorreu uma falha nesse sistema de medição nesses períodos.
+Em relação as variáveis provenientes da medição TBOGIE todas apresentaram um comportamento igual, ou seja, todas os casos nulos ocorreram no mesmo período, como todos esses dados são do T-BOGIE, acreditamos que ocorreu uma falha nesse sistema de medição nesses períodos.
 
 ### Realizando limpeza dos dados
 
@@ -552,7 +552,7 @@ df_sample_clean <- df_clean %>% sample(withReplacement = F,fraction = 0.01)
 
 
 
-### Identificar as principais estatisticas da Amostra {.tabset .tabset-fade .tabset-pills}
+### Identificar as principais estatísticas da Amostra {.tabset .tabset-fade .tabset-pills}
 
 Com o objetivo de verificar o comportamento geral dos dados verificamos as estatísticas principais das variáveis numéricas.
 
@@ -563,7 +563,7 @@ Com o objetivo de verificar o comportamento geral dos dados verificamos as estat
 <br>  
 Com base nessa avaliação que diferencia os LADOS e os EIXOS entendemos que essas variáveis categóricas são importantes para a construção do modelo.
 
-Indentificamos que todas as variáveis possuem valor máximo e minimo, dentro dos limites esperados.
+Identificamos que todas as variáveis possuem valor máximo e mínimo, dentro dos limites esperados.
 
 #### Geral
 
@@ -893,7 +893,7 @@ chart.Correlation(df_numeric, histogram=TRUE, pch=19)
 
 * É possível notar um grande aumento no volume de dados e uma menor variância nos dados após o mês de Maio de 2018.  
 
-* O tamanho das composições aumentam na mesma data.
+* Os tamanho das composições aumentam na mesma data.
     + Cada lote são 110 vagões, sendo em média 3 lotes.
 
 #### Friso Mensal
@@ -1122,7 +1122,7 @@ df_clean <- where(df_clean,df_clean$TRAIN_ID %in% trens_validos$TRAIN_ID) %>%
 
 ### Abertura Históricos Cenário 1 {.tabset .tabset-fade .tabset-pills}
 
-Para facilitar o entendimendo do problema foram criadas visualizações temporais de cada roda para os casos onde os trens (TRAIN ID) apresentaram o maior volume de rodas com espessura do friso abaixo de 26mm. A disposição dos gráficos representa as posições das rodas nos trucks e a alteração de cores indica o fim de um ciclo com a troca de um rodeiro.
+Para facilitar o entendimento do problema foram criadas visualizações temporais de cada roda para os casos onde os trens (TRAIN ID) apresentaram o maior volume de rodas com espessura do friso abaixo de 26mm. A disposição dos gráficos representa as posições das rodas nos trucks e a alteração de cores indica o fim de um ciclo com a troca de um rodeiro.
 
 No cenário 1 foram observados casos em que a apesar dos frisos terem ficado abaixo de 26 mm não ocorreram as trocas do rodeiro. Situação de risco indesejado.
 
@@ -1303,7 +1303,7 @@ myplots[[5]]
 
 Utilizamos 3 abordagens para realizar a preparação dos dados (ordenada na ordem de complexidade)
 
-  + Utilizar a base limpa (df_clean) sem alteração nos registros (df_clean) com balanceamendo entre 0 e 1 
+  + Utilizar a base limpa (df_clean) sem alteração nos registros (df_clean) com balanceamento entre 0 e 1 
   + Utilizar a base limpa (df_clean) com shift de resultados agrupado por roda/dia (df_pivot_spark)
   
 #### Base Clean
