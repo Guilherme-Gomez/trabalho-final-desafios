@@ -1368,21 +1368,25 @@ df_clean_test <- except(df_clean, df_undersampling)
 
 #### Base Pivot
 
-(descrição do procedimento do pivot)
 
-Criando a base de treino df_pivot_spark (outro trem)
+Neste passo é realizada uma agregação das rodas com dia de medição. Para fazer a agregação do dia foi criado um conceito da versão da medição de cada roda. De forma que cada vez que este elemento passar pelo processo de medição (um ciclo) o dado será incluído na base como a lógica de pilha, ou seja, o dado mais recente (última medição) será classificado como 1 e os demais seguem uma sequência incrementando um. As medições de rodas podem ocorrem em dias distintos, mas neste caso são agregadas pela sua versão de sua medição. Guardar o histórico desta forma permite escolher quantas medições históricas serão utilizadas no modelo.  
+Obs.: Foram utilizadas funções do R pela experiência do grupo em utilizar algumas funções como o pivot_wider.<br>
+Passos realizados para criar a base de treino:
+<br>
+
+1.  Under sampling: Para treino foram utilizadas as medições das rodas que estiveram no trem com o maior número de rodas com friso baixo na última medição (TRAIN_ID = 25B7F2F33).
+2.  Com tabelas auxiliares foi incluído na base histórica a versão da medição (Rank).
+3.  Foram removidas as colunas que não foram utilizadas no modelo, ex.: DATA_HORA_LEITURA.
+4.  Filtrada a quantidade de versões que entraram no modelo (RanK<=2 filtra apenas as medições da versão anterior e da atual).
+5.  Dados transferidos para dataframe R.
+6.  Foi criado uma variável nova identificando as rodas que foram trocadas (roda_trocada).
+7.  Realizada a transferência das informações que estão em diferentes linhas para colunas, de forma que cada roda terá apenas uma linha e seu histórico de medições em colunas identificadas ao final do nome com a versão, por exemplo "_02" indicando que se trata da medição anterior a atual.
+8.  As medições atuais são removidas do dataset, mantendo apenas as medições históricas e a variável target **FRISO_BAIXO**.
+9.  O mesmo processo é realizado para a base de teste, mas apenas com dados que não estão no trem utilizado para treino.
 
 ```{r Pivot_Treino, echo=TRUE}
 #Trem com o maior número de rodas com o friso baixo.
 createOrReplaceTempView(where(df,df$TRAIN_ID=='25B7F2F33'), "tabela_pior_trem")
-
-#createOrReplaceTempView(where(df_clean,df_clean$DIA>='2018-06-18'), "tabela_pior_trem")
-
-#Simulando com menos dados
-#createOrReplaceTempView(where(df,df$CODIGO_VAGAO=='98161'), "tabela_pior_trem")
-
-# createOrReplaceTempView(where(df,df$TRAIN_ID=='25B2F0558'), "tabela_pior_trem")
-# createOrReplaceTempView(where(df,df$TRAIN_ID=='25B3A93CC'), "tabela_pior_trem")
 
 vagoes <- sql("
               select CODIGO_VAGAO,DIA
@@ -1619,8 +1623,8 @@ summary(model_pivot_rf)
 
 #### Base simples
 
+
 ```{r Avalicao_regressao_logistica_clean, echo=TRUE, cache=TRUE}
-# Modelo básico de regressão logística
 model_clean_rl <- spark.logit(df_clean_train, FRISO_BAIXO ~ 
                        VELOCIDADE_ENTRADA_TREM+
                        VELOCIDADE_SAIDA_TREM+
@@ -1637,15 +1641,14 @@ model_clean_rl <- spark.logit(df_clean_train, FRISO_BAIXO ~
                        TRACKING_ERROR_TE,
                        thresholds = 0.5,
                      regParam = 0.5)
-
-
+# Modelo básico de regressão logística
 fitted_rl <- predict(model_clean_rl, df_clean_test)
 
 createOrReplaceTempView(fitted_rl, "predictions_rl")
 
 #dim(df_test)
 
-correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
+#correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
 #head(correct)
 
 #acc_rl = count(correct_rl)/count(fitted_rl)
@@ -1703,18 +1706,17 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 #### Base pivot
 
 ```{r Avalicao_regressao_logistica_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-# Modelo básico de regressão logística
 model_pivot_rl <- spark.logit(df_pivot_spark %>% drop("CODIGO_RODA"),
                               FRISO_BAIXO ~ ., thresholds = 0.5,
                      regParam = 0.5)
-
+# Modelo básico de regressão logística
 fitted_rl <- predict(model_pivot_rl, df_pivot_spark_teste)
 
 createOrReplaceTempView(fitted_rl, "predictions_rl")
 
 #dim(df_test)
 
-correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
+#correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
 #head(correct)
 
 #acc_rl = count(correct_rl)/count(fitted_rl)
@@ -1773,7 +1775,6 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 #### Base simples
 
 ```{r Avaliacao_random_forest_clean, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-# Modelo básico de random forest
 model_clean_rf <- spark.randomForest(df_clean_train, FRISO_BAIXO ~ 
                        VELOCIDADE_ENTRADA_TREM+
                        VELOCIDADE_SAIDA_TREM+
@@ -1792,13 +1793,10 @@ model_clean_rf <- spark.randomForest(df_clean_train, FRISO_BAIXO ~
                        "classification",
                      numTrees = 10)
 
+# Modelo básico de random forest
 fitted_rf <- predict(model_clean_rf, df_clean_test)
 
 createOrReplaceTempView(fitted_rf, "predictions_rf")
-
-correct_rf <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
-acc_rf = count(correct_rf)/count(fitted_rf)
-acc_rf
 
 # Matriz de confusao
 conf_matrix <- data.frame()
@@ -1807,25 +1805,25 @@ model_rf_TP <- sql("SELECT COUNT(1) as TRUE_POSITIVE FROM predictions_rf
                     WHERE FRISO_BAIXO=1 AND prediction=1
                     ") %>% head(1)
 
-model_rf_TP[1,1]
+#model_rf_TP[1,1]
 conf_matrix[1,1] <- model_rf_TP[1,1]
 
 model_rf_FP <- sql("SELECT COUNT(1) as FALSE_POSITIVE FROM predictions_rf
                     WHERE FRISO_BAIXO=0 AND prediction=1
                     ") %>% head(1)
-model_rf_FP[1,1]
+#model_rf_FP[1,1]
 conf_matrix[2,1] <- model_rf_FP[1,1]
 
 model_rf_TN <- sql("SELECT COUNT(1) as TRUE_NEGATIVE FROM predictions_rf 
                     WHERE FRISO_BAIXO=0 AND prediction=0
                     ") %>% head(1)
-model_rf_TN[1,1]
+#model_rf_TN[1,1]
 conf_matrix[2,2] <- model_rf_TN[1,1]
 
 model_rf_FN <- sql("SELECT COUNT(1) as FALSE_NEGATIVE FROM predictions_rf 
                     WHERE FRISO_BAIXO=1 AND prediction=0
                     ") %>% head(1)
-model_rf_FN[1,1]
+#model_rf_FN[1,1]
 conf_matrix[1,2] <- model_rf_FN[1,1]
 
 colnames(conf_matrix) <- c("PRED_TRUE","PRED_FALSE")
@@ -1833,7 +1831,6 @@ rownames(conf_matrix) <- c("REAL_TRUE","REAL_FALSE")
 
 conf_matrix %>% kable(., format = "html",row.names = T, digits = 2) %>%
 kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
-
 
 acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
 precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
@@ -1851,20 +1848,16 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 #### Base pivot
 
 ```{r Avalicao_random_forest_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-# Modelo básico de regressão logística
 model_pivot_rf <- spark.randomForest(df_pivot_spark %>% drop("CODIGO_RODA"), FRISO_BAIXO ~ ., "classification",  numTrees = 5)
-
+# Modelo básico de regressão logística
 fitted_rf <- predict(model_pivot_rf, df_pivot_spark_teste)
 
 createOrReplaceTempView(fitted_rf, "predictions_rf")
 
 #dim(df_test)
 
-correct_rf <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rf WHERE prediction=FRISO_BAIXO")
+#correct_rf <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rf WHERE prediction=FRISO_BAIXO")
 #head(correct)
-
-acc_rf = count(correct_rf)/count(fitted_rf)
-acc_rf
 
 # Matriz de confusao
 conf_matrix <- data.frame()
@@ -1916,7 +1909,11 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 
 ## Conclusão
 
-Escrever aqui o texto da conclusao
+Neste trabalho foi possível entender as reais necessidades que os projetos com grande volume de dados demandam e criar com sucesso um modelo para prever o comportamento das variáveis apresentadas no problema. Toda a organização da equipe e os processos desenvolvidos ao longo do trabalho foram baseados na metodologia CRISP-DM. Para organizar as contribuições da equipe foi primordial a utilização de versionamento na plataforma do github. O trabalho foi realizado utilizando as técnicas de map reduce implementadas no spark que possibilitaram o processamento paralelo e utilização controlada dos recursos disponíveis. Por vezes, as máquinas pessoais chegaram ao limite de seus recursos demandando a utilização de ferramentas em nuvem tanto com  saas (máquinas virtuais) como através da utilização do paas (DataBricks), mas com o aprimoramento dos conhecimento da equipe as próprias máquinas pessoais passaram a desempenhar de maneira satisfatória.
+A utilização das tecnicas aprendidas no curso para visualizar os dados permitiu debates sobre a natureza do problema envolvendo operação ferroviária, novo para boa parte da equipe. Foi possível entender as questões envolvidas nos desgastes das peças aplicar as técnicas aprendidas ao longo do curso.
+
+
+
 
 1. Adaptação para utilizar o Spark
 2. Entendimento do negócio para entender a dinamica dos trens
