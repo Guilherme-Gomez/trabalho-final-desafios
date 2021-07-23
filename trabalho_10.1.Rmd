@@ -246,6 +246,8 @@ Foram criadas as seguintes variáveis:
 
 ### Verificar a existência de dados faltantes
 
+Verificamos a concentração de dados nulos nas variáveis CAVA_RODA, ANGULO_FRISO_RODA e nas geradas pelo TBOGIE.
+
 ```{r Vericacao_da_qualidade_dos_dados, cache=TRUE}
 
 #Verificando qualidade dos dados.
@@ -310,15 +312,17 @@ cont_prob %>% kable(., format = "html",row.names = T, digits = 2) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed","responsive")) 
 ```
 
-Verificamos a concentração de dados nulos nas variáveis CAVA_RODA, ANGULO_FRISO_RODA e nas geradas pela do TBOGIE.
+
 
 ### Avaliando os dados nulos
 
-Avaliando a ocorrência de dados nulos de CAVA_RODA, ANGULO_FRiSO_RODA 
+Avaliando a ocorrência de dados nulos de CAVA_RODA e ANGULO_FRiSO_RODA 
 
-CAVA_RODA: A variável com maior número de dados nulos foi a CAVA_RODA com 607.049 (20%) de dados nulos. Com o objetivo de avaliar a estratégia de tratamento dos dados vamos realizar a distribuição de dados nulos em comparação com as outras variáveis.
+CAVA_RODA: A variável com maior número de dados nulos foi a CAVA_RODA com 607.049 (20%) de dados nulos. 
 
 ANGULO_FRISO_RODA: A segunda variável com maior número de dados nulos foi a ANGULO_FRISO_RODA com 287.408 (10%) dados nulos em comparação as outras variáveis.
+
+Como podemos perceber a ocorrência de dados nulos é distribuída por todo o período de medição sendo que ocorreu uma acentuação nos erros no segundo semestre de 2018. Essa acentuação é proporcional ao aumento do número de dados da amostra que aumentou significativamente no período. 
 
 ```{r Avaliacao_CAVA_RODA_ANGULO_FRISO, message=FALSE, warning=FALSE}
 
@@ -387,12 +391,13 @@ g_full
 
 ```
 
-Como podemos perceber a ocorrência de dados nulos é distribuída por todo o período de medição sendo que ocorreu uma acentuação nos erros no segundo semestre de 2018. Essa acentuação é proporcional ao aumento do número de dados da amostra que aumentou significativamente no período. 
 
-Avaliando as variáveis de TBOGIE  <br>
+
+Avaliando as variáveis de TBOGIE  
+<br>  
 ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE, ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE, TRACKING_POSITION_EIXO_FRONTAL_TRUQUE.
 
-Essas variáveis apresentam 19.723 (1%) de valores nulos
+Essas variáveis apresentam 19.723 de valores nulos, o que equivale a 1% do total dos dados.
 
 ```{r Avaliacao_dados_TBOGIE, message=FALSE, warning=FALSE}
 
@@ -474,7 +479,7 @@ Em relação as variáveis provenientes da medição TBOGIE todas apresentaram u
 
 Por termos uma base de dados volumosa, a estratégia adotada foi eliminar da base limpa todos os dados nulos.
 
-Total de dados da base original: `r round(nrow(df)[1],0)` 
+Total de dados da base original: `r as.character(round(nrow(df)[1],0))` 
 
 ```{r Limpeza_dados_1}
 
@@ -494,12 +499,12 @@ df_clean <- df_clean %>% where(.,!isNull(.[[25]]))
 
 ```
 
-Total de dados da base limpa: `r round(nrow(df_clean)[1],0)` 
+Total de dados da base limpa: `r as.character(round(nrow(df_clean)[1],0))` 
 
 ```{r Limpeza_dados_2, include=FALSE}
 # Redução dos dados
 reduc <- round(((dim(df_clean)[1]/dim(df)[1])-1)*100,2) 
-reduc <- paste("Redução dos dados de ",-reduc,"%",sep="")
+reduc <- paste("Redução dos dados foi de ",-reduc,"%",sep="")
 ```
 
 <br>
@@ -565,7 +570,7 @@ Com o objetivo de verificar o comportamento geral dos dados verificamos as estat
 
 Com base nessa avaliação que diferencia os LADOS e os EIXOS entendemos que essas variáveis categóricas são importantes para a construção do modelo.
 
-Por estes resultado é possível concluir que todas as variáveis possuem valor máximo e mínimo, dentro dos limites esperados.
+Também concluimos que todas as variáveis possuem valor máximo e mínimo dentro dos limites esperados.
 
 #### Geral
 
@@ -790,17 +795,17 @@ kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
 
 ### Correlações {.tabset .tabset-fade .tabset-pills}
 
-Em relação as variáveis numéricas, consideramos interessante verificar se existiam correlações relevantes em relação as variáveis.
+Em relação as variáveis numéricas, consideramos interessante analisar se existiam correlações relevantes.
 
-É possível perceber que algumas variáveis possuem correlações relevantes:
+É possível perceber que algumas variáveis possuem correlação:
 
 | Variável | Variável | 	Correlação |
 |------------|---------|---------:|
-| VELOCIDADE_ENTRADA_TREM |   VELOCIDADE_SAIDA_TREM | (0.91)
-| ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE | ALINHAMENTO_ENTRE_EIXOS_(IAM)  | (0.76)
-| TRACKING_POSITION_EIXO_FRONTAL_TRUQUE | DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)  | (0.72)
+| VELOCIDADE_ENTRADA_TREM (VEL_ET)|   VELOCIDADE_SAIDA_TREM (VEL_ST) | (0.91)
+| ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE (ANG_AETT)| ALINHAMENTO_ENTRE_EIXOS_(IAM)(ALI_EE)  | (0.76)
+| TRACKING_POSITION_EIXO_FRONTAL_TRUQUE (TR_PEFT) | DESLOCAMENTO_ENTRE_EIXOS_(SHIFT)(DES_EE)  | (0.72)
 
-Abreviações utilizadas
+Abreviações utilizadas nos gráficos
 
 | Abreviação | 	Coluna |  	 | Abreviação | 	Coluna | 	
 |------------|---------|  -  |------------|------------|
@@ -895,7 +900,7 @@ chart.Correlation(df_numeric, histogram=TRUE, pch=19)
 
 ### BoxPlot {.tabset .tabset-fade .tabset-pills}
 
-* É possível notar um grande aumento no volume de dados e uma menor variância após o mês de Maio de 2018.  
+* É possível notar um grande aumento no volume de dados medidos após o mês de Maio de 2018.  
 
 * O tamanho das composições aumenta na mesma data.
     + Cada lote são 110 vagões, sendo em média 3 lotes.
@@ -1305,14 +1310,20 @@ myplots[[5]]
 
 ### Criação de bases de trabalho
 
-Utilizamos 3 abordagens para realizar a preparação dos dados (ordenada na ordem de complexidade)
+Utilizamos 2 abordagens para realizar a preparação dos dados.
 
   + Utilizar a base limpa (df_clean) sem alteração nos registros (df_clean) com balanceamento entre 0 e 1 
   + Utilizar a base limpa (df_clean) com shift de resultados agrupado por roda/dia (df_pivot_spark)
   
 #### Base Clean
 
-Balanceamento e Divisão entre Treino e Teste (df_clean)
+A base df_clean é a base limpa com o balanceamento da base de testes.
+O balanceamento (undersample) foi realizado da seguinte forma: 
+
+* Selecionados todos os dados da base com FRISO_BAIXO = 1 
+* Selecionados de forma aleatória (Sample) a quantidade igual a 3 vezes o número de linhas da base anterior com FRISO_BAIXO = 0.
+* Combinação das duas bases, criando a base de treino.
+* Base de testes, sendo a base total menos os dados da base de teste.
 
 ```{r Balanceamento_df_clean}
 # Criar undersampling
@@ -1372,25 +1383,44 @@ df_clean_test <- except(df_clean, df_undersampling)
 
 #### Base Pivot
 
-
-Neste passo é realizada uma agregação das rodas com dia de medição. Para fazer a agregação do dia foi criado um conceito da versão da medição de cada roda. De forma que cada vez que este elemento passar pelo processo de medição (um ciclo) o dado será incluído na base como a lógica de pilha, ou seja, o dado mais recente (última medição) será classificado como 1 e os demais seguem uma sequência incrementando um, defnindo assim a versão (ou idade/ciclo) para a medida. As medições de rodas podem ocorrem em dias distintos, mas neste caso é possível agregar pela sua versão da medição. Guardar o histórico desta forma permite escolher quantas medições históricas serão utilizadas no modelo.  
-Obs.: Foram utilizadas funções do R pela experiência do grupo em utilizar algumas funções como o pivot_wider.<br>
+<br>
 Passos realizados para criar a base de treino:
 <br>
 
-1.  Under sampling: Para treino foram utilizadas as medições das rodas que estiveram no trem com o maior número de rodas com friso baixo na última medição (TRAIN_ID = 25B7F2F33).
-2.  Com tabelas auxiliares foi incluído na base histórica a versão da medição (Rank).
+1.  Under sampling: Para treino foram utilizadas as medições das rodas que estiveram no trem com o maior número de rodas com friso baixo na última medição. Por exemplo: TRAIN_ID = 25B7F2F33 com 157 rodas com FRISO_BAIXO=1.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+createOrReplaceTempView(where(df,df$DIA >='2018-08-19' ), "tabela_ultimo_ciclo")
+
+tabela_pior_trem <- sql("select TRAIN_ID,DIA, count(*) Quantidade_Rodas_Friso_Baixo
+
+              from tabela_ultimo_ciclo 
+              where FRISO_BAIXO=1
+              group by TRAIN_ID,DIA
+              order by Quantidade_Rodas_Friso_Baixo desc
+")
+piores_trens <- tabela_pior_trem %>% head(5)
+
+tabela_pior_trem %>% head(5) %>% kable(., format = "html",row.names = T, digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
+```
+
+2.  Com tabelas auxiliares foi incluído na base histórica a ordem da medição (Rank).
 3.  Foram removidas as colunas que não foram utilizadas no modelo, ex.: DATA_HORA_LEITURA.
-4.  Filtrada a quantidade de versões que entraram no modelo (RanK<=2 filtra apenas as medições da versão anterior e da atual).
+4.  Filtrada a quantidade de versões (Rank) de medições que entraram no modelo (RanK<=2 filtra apenas as medições da versão anterior e da atual).
 5.  Dados transferidos para dataframe R.
 6.  Foi criado uma variável nova identificando as rodas que foram trocadas (roda_trocada).
 7.  Realizada a transferência das informações que estão em diferentes linhas para colunas, de forma que cada roda terá apenas uma linha e seu histórico de medições em colunas identificadas ao final do nome com a versão, por exemplo "_02" indicando que se trata da medição anterior a atual.
 8.  As medições atuais são removidas do dataset, mantendo apenas as medições históricas e a variável target **FRISO_BAIXO**.
-9.  O mesmo processo é realizado para a base de teste, mas apenas com dados que não estão no trem utilizado para treino.
+9.  O mesmo processo é realizado para a base de teste, mas apenas com dados que não estão no(s) trem(ns) utilizado(s) para treino.
 
 ```{r Pivot_Treino, echo=TRUE}
 #Trem com o maior número de rodas com o friso baixo.
 createOrReplaceTempView(where(df,df$TRAIN_ID=='25B7F2F33'), "tabela_pior_trem")
+
+#createOrReplaceTempView(where(df,df$TRAIN_ID %in% piores_trens$TRAIN_ID), "tabela_pior_trem")
 
 vagoes <- sql("
               select CODIGO_VAGAO,DIA
@@ -1425,7 +1455,7 @@ df_pivot <- tabela_join %>%
   drop(c("DATA_HORA_LEITURA","CODIGO_RODEIRO","CODIGO_VAGAO","SENTIDO_TREM","TRAIN_ID","POSICAO_VAGAO_COMPOSICAO","DIA","FRISO_MENOR_QUE_26")) %>% 
 #"EIXO_VAGAO" e "LADO_RODA" devem ser mantiodos
 #definindo o perído avaliação.
-  where(.,.$Rank<=2) %>% 
+  where(.,.$Rank<=3) %>% 
   collect() %>% 
 #Usando "ROW_ID","CICLO_RODEIRO" para identificar mudanças de rodeiros.
   dplyr::mutate(roda_trocada=if_else(.$ROW_ID==.$CICLO_RODEIRO,1,0)) %>% 
@@ -1472,12 +1502,14 @@ head(df_pivot_spark) %>% rmarkdown::paged_table()
 Criando a base de teste df_pivot_spark (outro trem)
 
 ```{r Pivot_base_teste, echo=TRUE}
-createOrReplaceTempView(where(df,df$TRAIN_ID=='25B7F2F33'), "tabela_pior_trem")
-vagoes <- sql("
-              select CODIGO_VAGAO,DIA
-              from tabela_pior_trem 
-              group by CODIGO_VAGAO,DIA
-              order by CODIGO_VAGAO,DIA desc") %>% collect()
+#createOrReplaceTempView(where(df,df$TRAIN_ID=='25B7F2F33'), "tabela_pior_trem")
+#createOrReplaceTempView(where(df,df$TRAIN_ID %in% piores_trens$TRAIN_ID), "tabela_pior_trem")
+
+#vagoes <- sql("
+#              select CODIGO_VAGAO,DIA
+#              from tabela_pior_trem 
+#              group by CODIGO_VAGAO,DIA
+#              order by CODIGO_VAGAO,DIA desc") %>% collect()
 
 createOrReplaceTempView(where(df_clean,df_clean$TRAIN_ID != '25B7F2F33'), "tabela_vagoes_menos_pior_trem")
 
@@ -1529,103 +1561,13 @@ df_pivot_spark_teste <- createDataFrame(df_pivot_teste, schema = NULL)
 
 ## Modelagem
 
-### Regressão logística {.tabset .tabset-fade .tabset-pills}
+### Modelo 1 {.tabset .tabset-fade .tabset-pills}
+
+O primeiro modelo criado foi utilizando a base clean e não foram encontrados bons resultados.
 
 #### X
 
-#### Base simples
-
-```{r Modelo_clean_reg_log, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-# Modelo básico de regressão logística
-#head(df_train)
-#colnames(df_train)
-
-# Dividindo entre treino e teste
-
-model_clean_rl <- spark.logit(df_clean_train, FRISO_BAIXO ~ 
-                       VELOCIDADE_ENTRADA_TREM+
-                       VELOCIDADE_SAIDA_TREM+
-                       ANGULO_FRISO_RODA+
-                       ALTURA_FRISO_RODA+
-                       CAVA_RODA+
-                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
-                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
-                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
-                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
-                       ROTACAO_EIXO+
-                       ALINHAMENTO_ENTRE_EIXOS_IAM+
-                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
-                       TRACKING_ERROR_TE,
-                       thresholds = 0.5,
-                     regParam = 0.5)
-
-summary(model_clean_rl)
-
-```
-
-#### Base pivot
-
-```{r Modelo_pivot_reg_log, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-# Modelo básico de regressão logística
-#head(df_train)
-#colnames(df_train)
-
-# Dividindo entre treino e teste
-model_pivot_rl <- spark.logit(df_pivot_spark %>% drop("CODIGO_RODA"),
-                              FRISO_BAIXO ~ ., thresholds = 0.5,
-                     regParam = 0.5)
-
-summary(model_pivot_rl)
-
-```
-
-### Random Forest {.tabset .tabset-fade .tabset-pills}
-
-#### X
-
-#### Base simples
-
-```{r Modelo_random_forest_clean, echo=TRUE, message=FALSE, warning=FALSE}
-model_clean_rf <- spark.randomForest(df_clean_train, FRISO_BAIXO ~ 
-                       VELOCIDADE_ENTRADA_TREM+
-                       VELOCIDADE_SAIDA_TREM+
-                       ANGULO_FRISO_RODA+
-                       ALTURA_FRISO_RODA+
-                       CAVA_RODA+
-                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
-                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
-                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
-                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
-                       ROTACAO_EIXO+
-                       ALINHAMENTO_ENTRE_EIXOS_IAM+
-                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
-                       TRACKING_ERROR_TE+
-                       SERPENTEAMENTO_HUNTING,
-                       "classification",
-                     numTrees = 10)
-
-summary(model_clean_rf)
-```
-
-#### Base pivot
-
-```{r Modelo_pivot_random_forest, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-# Modelo básico de regressão logística
-#head(df_train)
-#colnames(df_train)
-
-# Dividindo entre treino e teste
-model_pivot_rf <- spark.randomForest(df_pivot_spark %>% drop("CODIGO_RODA"), FRISO_BAIXO ~ ., "classification",  numTrees = 5)
-
-summary(model_pivot_rf)
-
-```
-
-## Avaliação
-
-### Regressão logística
-
-#### Base simples
+#### Regressão Logística
 
 
 ```{r Avalicao_regressao_logistica_clean, echo=TRUE, cache=TRUE}
@@ -1706,77 +1648,30 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 | Sensibilidade | `r round(sensibilidade,2)`	| 
 | Especificidade | `r round(especificidade,2)`	| 
 
+#### Summary Regressão Logística
 
-#### Base pivot
-
-```{r Avalicao_regressao_logistica_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-model_pivot_rl <- spark.logit(df_pivot_spark %>% drop("CODIGO_RODA"),
-                              FRISO_BAIXO ~ ., thresholds = 0.5,
+```{r}
+model_clean_rl <- spark.logit(df_clean_train, FRISO_BAIXO ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       ANGULO_FRISO_RODA+
+                       ALTURA_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO+
+                       ALINHAMENTO_ENTRE_EIXOS_IAM+
+                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
+                       TRACKING_ERROR_TE,
+                       thresholds = 0.5,
                      regParam = 0.5)
-# Modelo básico de regressão logística
-fitted_rl <- predict(model_pivot_rl, df_pivot_spark_teste)
-
-createOrReplaceTempView(fitted_rl, "predictions_rl")
-
-#dim(df_test)
-
-#correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
-#head(correct)
-
-#acc_rl = count(correct_rl)/count(fitted_rl)
-#acc_rl
-
-# Matriz de confusao
-conf_matrix <- data.frame()
-
-model_rl_TP <- sql("SELECT COUNT(1) as TRUE_POSITIVE FROM predictions_rl 
-                    WHERE FRISO_BAIXO=1 AND prediction=1
-                    ") %>% head(1)
-
-#model_rl_TP[1,1]
-conf_matrix[1,1] <- model_rl_TP[1,1]
-
-model_rl_FP <- sql("SELECT COUNT(1) as FALSE_POSITIVE FROM predictions_rl 
-                    WHERE FRISO_BAIXO=0 AND prediction=1
-                    ") %>% head(1)
-#model_rl_FP[1,1]
-conf_matrix[2,1] <- model_rl_FP[1,1]
-
-model_rl_TN <- sql("SELECT COUNT(1) as TRUE_NEGATIVE FROM predictions_rl 
-                    WHERE FRISO_BAIXO=0 AND prediction=0
-                    ") %>% head(1)
-#model_rl_TN[1,1]
-conf_matrix[2,2] <- model_rl_TN[1,1]
-
-model_rl_FN <- sql("SELECT COUNT(1) as FALSE_NEGATIVE FROM predictions_rl 
-                    WHERE FRISO_BAIXO=1 AND prediction=0
-                    ") %>% head(1)
-#model_rl_FN[1,1]
-conf_matrix[1,2] <- model_rl_FN[1,1]
-
-colnames(conf_matrix) <- c("PRED_TRUE","PRED_FALSE")
-rownames(conf_matrix) <- c("REAL_TRUE","REAL_FALSE")
-
-conf_matrix %>% kable(., format = "html",row.names = T, digits = 2) %>%
-kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
-
-
-acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
-precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-sensibilidade <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
-especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
+summary(model_clean_rl)
 ```
 
-| Indicador | 	Coluna |  	
-|------------|---------| 
-| Acurácia | `r round(acuracia,2)`	| 
-| Precisao | `r round(precisao,2)`	| 
-| Sensibilidade | `r round(sensibilidade,2)`	| 
-| Especificidade | `r round(especificidade,2)`	| 
+#### Random Forest
 
-### Random Forest
-
-#### Base simples
 
 ```{r Avaliacao_random_forest_clean, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
 model_clean_rf <- spark.randomForest(df_clean_train, FRISO_BAIXO ~ 
@@ -1849,11 +1744,123 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 | Sensibilidade | `r round(sensibilidade,2)`	| 
 | Especificidade | `r round(especificidade,2)`	| 
 
-#### Base pivot
+#### Summary Random Forest
 
-```{r Avalicao_random_forest_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
-model_pivot_rf <- spark.randomForest(df_pivot_spark %>% drop("CODIGO_RODA"), FRISO_BAIXO ~ ., "classification",  numTrees = 5)
+```{r}
+model_clean_rf <- spark.randomForest(df_clean_train, FRISO_BAIXO ~ 
+                       VELOCIDADE_ENTRADA_TREM+
+                       VELOCIDADE_SAIDA_TREM+
+                       ANGULO_FRISO_RODA+
+                       ALTURA_FRISO_RODA+
+                       CAVA_RODA+
+                       ANGULO_ATAQUE_EIXO_FRONTAL_TRUQUE+
+                       ANGULO_ATAQUE_EIXO_TRASEIRO_TRUQUE+
+                       TRACKING_POSITION_EIXO_FRONTAL_TRUQUE+
+                       TRACKING_POSITION_EIXO_TRASEIRO_TRUQUE+
+                       ROTACAO_EIXO+
+                       ALINHAMENTO_ENTRE_EIXOS_IAM+
+                       DESLOCAMENTO_ENTRE_EIXOS_SHIFT+
+                       TRACKING_ERROR_TE+
+                       SERPENTEAMENTO_HUNTING,
+                       "classification",
+                     numTrees = 10)
+summary(model_clean_rf)
+```
+
+
+### Modelo 2 {.tabset .tabset-fade .tabset-pills}
+
+Como o modelo 1 não teve uma boa performance, decidimos buscar um tratamento da base para incluir os dados históricos de medição (df_pivot). Com isso, a regressão logística não apresentou um bom desempenho porém o modelo random forest apresentou um resultado satisfatório, sendo este o escolhido para a solução do problema. 
+
+#### X
+
+#### Regressão Logística
+
+```{r Avalicao_regressao_logistica_pivot, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+model_pivot_rl <- spark.logit(df_pivot_spark %>% drop("CODIGO_RODA"),
+                              FRISO_BAIXO ~ ., thresholds = 0.5,
+                     regParam = 0.5)
 # Modelo básico de regressão logística
+fitted_rl <- predict(model_pivot_rl, df_pivot_spark_teste)
+
+createOrReplaceTempView(fitted_rl, "predictions_rl")
+
+#dim(df_test)
+
+#correct_rl <- sql("SELECT prediction, FRISO_BAIXO FROM predictions_rl WHERE prediction=FRISO_BAIXO")
+#head(correct)
+
+#acc_rl = count(correct_rl)/count(fitted_rl)
+#acc_rl
+
+# Matriz de confusao
+conf_matrix <- data.frame()
+
+model_rl_TP <- sql("SELECT COUNT(1) as TRUE_POSITIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=1 AND prediction=1
+                    ") %>% head(1)
+
+#model_rl_TP[1,1]
+conf_matrix[1,1] <- model_rl_TP[1,1]
+
+model_rl_FP <- sql("SELECT COUNT(1) as FALSE_POSITIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=0 AND prediction=1
+                    ") %>% head(1)
+#model_rl_FP[1,1]
+conf_matrix[2,1] <- model_rl_FP[1,1]
+
+model_rl_TN <- sql("SELECT COUNT(1) as TRUE_NEGATIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=0 AND prediction=0
+                    ") %>% head(1)
+#model_rl_TN[1,1]
+conf_matrix[2,2] <- model_rl_TN[1,1]
+
+model_rl_FN <- sql("SELECT COUNT(1) as FALSE_NEGATIVE FROM predictions_rl 
+                    WHERE FRISO_BAIXO=1 AND prediction=0
+                    ") %>% head(1)
+#model_rl_FN[1,1]
+conf_matrix[1,2] <- model_rl_FN[1,1]
+
+colnames(conf_matrix) <- c("PRED_TRUE","PRED_FALSE")
+rownames(conf_matrix) <- c("REAL_TRUE","REAL_FALSE")
+
+conf_matrix %>% kable(., format = "html",row.names = T, digits = 2) %>%
+kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"))
+
+
+acuracia <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[2,2]+conf_matrix[1,2]+conf_matrix[2,1])
+precisao <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
+sensibilidade <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[2,1])
+especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
+```
+
+| Indicador | 	Coluna |  	
+|------------|---------| 
+| Acurácia | `r round(acuracia,2)`	| 
+| Precisao | `r round(precisao,2)`	| 
+| Sensibilidade | `r round(sensibilidade,2)`	| 
+| Especificidade | `r round(especificidade,2)`	| 
+
+#### Summary Regressão Logística
+
+```{r}
+model_pivot_rl <- spark.logit(df_pivot_spark %>% drop("CODIGO_RODA"),
+                              FRISO_BAIXO ~ ., thresholds = 0.5,
+                     regParam = 0.5)
+summary(model_pivot_rl)
+```
+
+
+#### Random Forest
+
+```{r Modelo_pivot_random_forest, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+# Modelo básico de regressão logística
+#head(df_train)
+#colnames(df_train)
+
+# Dividindo entre treino e teste
+model_pivot_rf <- spark.randomForest(df_pivot_spark %>% drop("CODIGO_RODA"), FRISO_BAIXO ~ ., "classification",  numTrees = 5)
+
 fitted_rf <- predict(model_pivot_rf, df_pivot_spark_teste)
 
 createOrReplaceTempView(fitted_rf, "predictions_rf")
@@ -1911,17 +1918,21 @@ especificidade <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
 | Sensibilidade | `r round(sensibilidade,2)`	| 
 | Especificidade | `r round(especificidade,2)`	| 
 
+#### Summary Random Forest
+
+```{r}
+# Dividindo entre treino e teste
+model_pivot_rf <- spark.randomForest(df_pivot_spark %>% drop("CODIGO_RODA"), FRISO_BAIXO ~ ., "classification",  numTrees = 5)
+summary(model_pivot_rf)
+```
+
+
 ## Conclusão
 
-Neste trabalho foi possível entender as reais necessidades que os projetos com grande volume de dados demandam e criar com sucesso um modelo para prever o comportamento das variáveis apresentadas no problema. Toda a organização da equipe e os processos desenvolvidos ao longo do trabalho foram baseadas na metodologia CRISP-DM. Para viabilizar as contribuições da equipe foi primordial a utilização de versionamento na plataforma do github. O trabalho foi realizado utilizando as técnicas de *map reduce* implementadas no *spark* que possibilitaram o processamento paralelo e utilização controlada dos recursos disponíveis. Por vezes, as máquinas pessoais chegaram ao limite de seus recursos demandando a utilização de ferramentas em nuvem tanto com  saas (máquinas virtuais) como através da utilização do paas (DataBricks), mas com o aprimoramento dos conhecimentos da equipe as próprias máquinas pessoais passaram a desempenhar de maneira satisfatória.
+Neste trabalho foi possível entender as reais necessidades que os projetos com grande volume de dados demandam e criar com sucesso um modelo para prever o comportamento das variáveis apresentadas no problema.  
+Toda a organização da equipe e os processos desenvolvidos ao longo do trabalho foram baseadas na metodologia CRISP-DM.   
+Para viabilizar as contribuições da equipe foi primordial a utilização de versionamento na plataforma do github.   
+O trabalho foi realizado utilizando as técnicas de *map reduce* implementadas no *spark* que possibilitaram o processamento paralelo e utilização controlada dos recursos disponíveis. Por vezes, as máquinas pessoais chegaram ao limite de seus recursos demandando a utilização de ferramentas em nuvem tanto com  saas (máquinas virtuais) como através da utilização do paas (DataBricks), mas com o aprimoramento dos conhecimentos da equipe as próprias máquinas pessoais passaram a desempenhar de maneira satisfatória.
 A utilização das técnicas aprendidas no curso para visualizar os dados permitiu debates sobre a natureza do problema envolvendo a rotina de operações ferroviárias, novo para boa parte da equipe. Foi possível entender as questões envolvidas nos desgastes das peças aplicar as técnicas aprendidas ao longo do curso.
-Durante o desenvolvimento do projeto tomamos a decisão de remover parte dos dados, pois há um grande volume de informações e suficiente para treinar o modelo, mas ao final, foi percebido uma melhoria que pode ser implementada para o acompanhamento de um sistema real. Após a realização do pivot_wider notamos que os dados poderiam ser complementados com as medições históricas, pois em algumas situações linhas podem ser eliminadas por falta de algum dado que sendo substituído poderia gerar um alerta.
-
-
-
-1. Adaptação para utilizar o Spark
-2. Entendimento do negócio para entender a dinâmica dos trens
-3. Importância do balanceamento das base.
-4. Utilização de solução criativa para balanceamento.
-5. Resultado da árvore mais preciso que a regressão logística.
+Ao final do trabalho, após extensa experimentação, conseguimos encontrar um modelo de Random Forest mais adequado que apresentou 1627 de previsões varedadeiro-positivo o que representa uma precisão de 66%. 
 
